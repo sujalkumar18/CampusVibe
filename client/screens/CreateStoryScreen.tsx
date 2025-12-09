@@ -1,0 +1,333 @@
+import React, { useState } from "react";
+import {
+  View,
+  StyleSheet,
+  Pressable,
+  TextInput,
+  Alert,
+  Platform,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { Feather } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
+import * as Haptics from "expo-haptics";
+import { Image } from "expo-image";
+
+import { useTheme } from "@/hooks/useTheme";
+import { Colors, Spacing, BorderRadius, CategoryColors } from "@/constants/theme";
+import { ThemedText } from "@/components/ThemedText";
+import { RootStackParamList } from "@/navigation/RootStackNavigator";
+
+type Category = "confession" | "crush" | "meme" | "rant" | "compliment";
+
+const CATEGORIES: { key: Category; label: string }[] = [
+  { key: "confession", label: "Confession" },
+  { key: "crush", label: "Crush" },
+  { key: "meme", label: "Meme" },
+  { key: "rant", label: "Rant" },
+  { key: "compliment", label: "Compliment" },
+];
+
+const COLORS = [
+  "#6C5CE7",
+  "#FF6B9D",
+  "#00B894",
+  "#FFA502",
+  "#00D2D3",
+  "#1B4332",
+  "#4A1942",
+  "#1A365D",
+];
+
+export default function CreateStoryScreen() {
+  const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
+  const [text, setText] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [backgroundColor, setBackgroundColor] = useState(COLORS[0]);
+  const [imageUri, setImageUri] = useState<string | null>(null);
+
+  const canPost = (text.trim().length > 0 || imageUri) && selectedCategory !== null;
+
+  const handlePickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [9, 16],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      setImageUri(result.assets[0].uri);
+    }
+  };
+
+  const handlePost = async () => {
+    if (!canPost) return;
+
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    
+    Alert.alert("Story Posted!", "Your anonymous story will be visible for 24 hours.", [
+      {
+        text: "OK",
+        onPress: () => navigation.goBack(),
+      },
+    ]);
+  };
+
+  const handleClose = () => {
+    if (text.trim().length > 0 || imageUri) {
+      Alert.alert(
+        "Discard Story?",
+        "Are you sure you want to discard this story?",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Discard",
+            style: "destructive",
+            onPress: () => navigation.goBack(),
+          },
+        ]
+      );
+    } else {
+      navigation.goBack();
+    }
+  };
+
+  return (
+    <View style={[styles.container, { backgroundColor }]}>
+      {imageUri && (
+        <Image source={{ uri: imageUri }} style={styles.backgroundImage} />
+      )}
+
+      <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
+        <Pressable onPress={handleClose} style={styles.headerButton}>
+          <Feather name="x" size={28} color="#FFFFFF" />
+        </Pressable>
+        <Pressable
+          onPress={handlePost}
+          style={[
+            styles.postButton,
+            {
+              backgroundColor: canPost
+                ? "rgba(255,255,255,0.2)"
+                : "rgba(255,255,255,0.1)",
+            },
+          ]}
+          disabled={!canPost}
+        >
+          <ThemedText
+            style={{
+              color: canPost ? "#FFFFFF" : "rgba(255,255,255,0.5)",
+              fontWeight: "600",
+            }}
+          >
+            Share Story
+          </ThemedText>
+        </Pressable>
+      </View>
+
+      <View style={styles.contentContainer}>
+        {selectedCategory && (
+          <View
+            style={[
+              styles.categoryBadge,
+              { backgroundColor: CategoryColors[selectedCategory] + "60" },
+            ]}
+          >
+            <ThemedText
+              style={[
+                styles.categoryBadgeText,
+                { color: CategoryColors[selectedCategory] },
+              ]}
+            >
+              {selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)}
+            </ThemedText>
+          </View>
+        )}
+
+        <TextInput
+          style={styles.textInput}
+          placeholder="Type something..."
+          placeholderTextColor="rgba(255,255,255,0.5)"
+          value={text}
+          onChangeText={setText}
+          multiline
+          maxLength={200}
+          textAlign="center"
+        />
+      </View>
+
+      <View style={[styles.bottomControls, { paddingBottom: insets.bottom + Spacing.lg }]}>
+        <View style={styles.colorPicker}>
+          {COLORS.map((color) => (
+            <Pressable
+              key={color}
+              onPress={() => {
+                setBackgroundColor(color);
+                setImageUri(null);
+              }}
+              style={[
+                styles.colorOption,
+                { backgroundColor: color },
+                backgroundColor === color && !imageUri && styles.colorSelected,
+              ]}
+            />
+          ))}
+        </View>
+
+        <View style={styles.categoryPicker}>
+          <ThemedText style={styles.categoryLabel}>Category:</ThemedText>
+          <View style={styles.categoryRow}>
+            {CATEGORIES.map((cat) => {
+              const isSelected = selectedCategory === cat.key;
+              return (
+                <Pressable
+                  key={cat.key}
+                  onPress={async () => {
+                    await Haptics.selectionAsync();
+                    setSelectedCategory(cat.key);
+                  }}
+                  style={[
+                    styles.categoryChip,
+                    {
+                      backgroundColor: isSelected
+                        ? "rgba(255,255,255,0.3)"
+                        : "rgba(255,255,255,0.1)",
+                    },
+                  ]}
+                >
+                  <ThemedText style={styles.categoryChipText}>
+                    {cat.label}
+                  </ThemedText>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={styles.actionRow}>
+          <Pressable onPress={handlePickImage} style={styles.actionButton}>
+            <Feather name="image" size={24} color="#FFFFFF" />
+            <ThemedText style={styles.actionText}>Add Photo</ThemedText>
+          </Pressable>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  backgroundImage: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.8,
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: Spacing.md,
+  },
+  headerButton: {
+    padding: Spacing.sm,
+  },
+  postButton: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+  },
+  contentContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: Spacing.xl,
+  },
+  categoryBadge: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.full,
+    marginBottom: Spacing.md,
+  },
+  categoryBadgeText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  textInput: {
+    fontSize: 24,
+    fontWeight: "600",
+    color: "#FFFFFF",
+    textShadowColor: "rgba(0,0,0,0.3)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+    maxWidth: "100%",
+    minWidth: 200,
+  },
+  bottomControls: {
+    paddingHorizontal: Spacing.md,
+  },
+  colorPicker: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: Spacing.sm,
+    marginBottom: Spacing.lg,
+  },
+  colorOption: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
+  colorSelected: {
+    borderWidth: 3,
+    borderColor: "#FFFFFF",
+  },
+  categoryPicker: {
+    marginBottom: Spacing.lg,
+  },
+  categoryLabel: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 12,
+    marginBottom: Spacing.sm,
+    textAlign: "center",
+  },
+  categoryRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: Spacing.sm,
+  },
+  categoryChip: {
+    paddingHorizontal: Spacing.sm + 4,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+  },
+  categoryChipText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  actionRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+  },
+  actionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.15)",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    gap: Spacing.xs,
+  },
+  actionText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+});

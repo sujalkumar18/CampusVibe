@@ -1,12 +1,18 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import MainTabNavigator from "@/navigation/MainTabNavigator";
-import ModalScreen from "@/screens/ModalScreen";
+import CreatePostScreen from "@/screens/CreatePostScreen";
+import CreateReelScreen from "@/screens/CreateReelScreen";
+import CreateStoryScreen from "@/screens/CreateStoryScreen";
+import PostDetailScreen from "@/screens/PostDetailScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 
 export type RootStackParamList = {
   Main: undefined;
-  Modal: undefined;
+  CreatePost: undefined;
+  CreateReel: undefined;
+  CreateStory: undefined;
+  PostDetail: { postId: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -22,11 +28,34 @@ export default function RootStackNavigator() {
         options={{ headerShown: false }}
       />
       <Stack.Screen
-        name="Modal"
-        component={ModalScreen}
+        name="CreatePost"
+        component={CreatePostScreen}
         options={{
           presentation: "modal",
-          headerTitle: "Modal",
+          headerTitle: "New Post",
+        }}
+      />
+      <Stack.Screen
+        name="CreateReel"
+        component={CreateReelScreen}
+        options={{
+          presentation: "fullScreenModal",
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="CreateStory"
+        component={CreateStoryScreen}
+        options={{
+          presentation: "fullScreenModal",
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="PostDetail"
+        component={PostDetailScreen}
+        options={{
+          headerTitle: "Post",
         }}
       />
     </Stack.Navigator>
