@@ -5,7 +5,7 @@ import {
   Pressable,
   TextInput,
   Alert,
-  Platform,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
@@ -22,7 +22,9 @@ import Animated, {
 
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useTheme } from "@/hooks/useTheme";
-import { Colors, Spacing, BorderRadius, CategoryColors } from "@/constants/theme";
+import { useAuth } from "@/hooks/useAuth";
+import { useCreatePost } from "@/hooks/usePosts";
+import { Spacing, BorderRadius, CategoryColors } from "@/constants/theme";
 import { ThemedText } from "@/components/ThemedText";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
 
@@ -98,12 +100,14 @@ export default function CreatePostScreen() {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { user } = useAuth();
+  const createPost = useCreatePost();
 
   const [content, setContent] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [images, setImages] = useState<string[]>([]);
 
-  const canPost = content.trim().length > 0 && selectedCategory !== null;
+  const canPost = content.trim().length > 0 && selectedCategory !== null && !createPost.isPending;
   const charsLeft = MAX_CHARS - content.length;
 
   const handlePickImage = async () => {
@@ -125,16 +129,22 @@ export default function CreatePostScreen() {
   };
 
   const handlePost = async () => {
-    if (!canPost) return;
+    if (!canPost || !user || !selectedCategory) return;
 
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    
-    Alert.alert("Posted!", "Your anonymous post has been shared with the campus.", [
-      {
-        text: "OK",
-        onPress: () => navigation.goBack(),
-      },
-    ]);
+    try {
+      await createPost.mutateAsync({
+        userId: user.id,
+        content: content.trim(),
+        category: selectedCategory,
+        imageUrl: images.length > 0 ? images[0] : undefined,
+      });
+
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      navigation.goBack();
+    } catch (error) {
+      console.error("Failed to create post:", error);
+      Alert.alert("Error", "Failed to create post. Please try again.");
+    }
   };
 
   const handleCreateReel = () => {
@@ -160,14 +170,18 @@ export default function CreatePostScreen() {
           ]}
           disabled={!canPost}
         >
-          <ThemedText
-            style={[
-              styles.postButtonText,
-              { color: canPost ? "#FFFFFF" : theme.textTertiary },
-            ]}
-          >
-            Post
-          </ThemedText>
+          {createPost.isPending ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <ThemedText
+              style={[
+                styles.postButtonText,
+                { color: canPost ? "#FFFFFF" : theme.textTertiary },
+              ]}
+            >
+              Post
+            </ThemedText>
+          )}
         </Pressable>
       </View>
 
@@ -307,6 +321,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.full,
+    minWidth: 60,
+    alignItems: "center",
   },
   postButtonText: {
     fontWeight: "600",

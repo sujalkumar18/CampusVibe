@@ -5,121 +5,48 @@ import {
   ScrollView,
   Pressable,
   Alert,
+  ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
   FadeIn,
   Layout,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
 
 import { useTheme } from "@/hooks/useTheme";
-import { Colors, Spacing, BorderRadius, CategoryColors } from "@/constants/theme";
+import { useAuth } from "@/hooks/useAuth";
+import { useUserPosts, useDeletePost, type Post } from "@/hooks/usePosts";
+import { Spacing, BorderRadius, CategoryColors } from "@/constants/theme";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 
-type ContentType = "posts" | "reels" | "stories";
+const formatTimeAgo = (dateString: string): string => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
 
-type UserPost = {
-  id: string;
-  type: "post" | "reel" | "story";
-  content: string;
-  category: string;
-  upvotes: number;
-  timeAgo: string;
-};
-
-const MOCK_USER_POSTS: UserPost[] = [
-  {
-    id: "1",
-    type: "post",
-    content: "Finally confessed to my crush in library yesterday...",
-    category: "confession",
-    upvotes: 156,
-    timeAgo: "2h ago",
-  },
-  {
-    id: "2",
-    type: "post",
-    content: "WiFi in hostel is slower than my will to attend 8 AM lectures",
-    category: "meme",
-    upvotes: 342,
-    timeAgo: "5h ago",
-  },
-  {
-    id: "3",
-    type: "reel",
-    content: "When professor says 'This won't be on the exam'...",
-    category: "meme",
-    upvotes: 1234,
-    timeAgo: "1d ago",
-  },
-  {
-    id: "4",
-    type: "story",
-    content: "I secretly water the plants in the common room...",
-    category: "confession",
-    upvotes: 89,
-    timeAgo: "2d ago",
-  },
-];
-
-const SegmentedControl = ({
-  options,
-  selected,
-  onChange,
-}: {
-  options: { key: ContentType; label: string; icon: string }[];
-  selected: ContentType;
-  onChange: (key: ContentType) => void;
-}) => {
-  const { theme } = useTheme();
-
-  return (
-    <View style={[styles.segmentedControl, { backgroundColor: theme.surface }]}>
-      {options.map((option) => {
-        const isSelected = selected === option.key;
-        return (
-          <Pressable
-            key={option.key}
-            onPress={() => onChange(option.key)}
-            style={[
-              styles.segmentOption,
-              isSelected && {
-                backgroundColor: theme.primary,
-              },
-            ]}
-          >
-            <Feather
-              name={option.icon as any}
-              size={18}
-              color={isSelected ? "#FFFFFF" : theme.textSecondary}
-            />
-            <ThemedText
-              style={[
-                styles.segmentLabel,
-                { color: isSelected ? "#FFFFFF" : theme.textSecondary },
-              ]}
-            >
-              {option.label}
-            </ThemedText>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
+  if (diffMins < 1) return "now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  return `${diffDays}d ago`;
 };
 
 const PostItem = ({
   post,
   onDelete,
+  isDeleting,
 }: {
-  post: UserPost;
+  post: Post;
   onDelete: () => void;
+  isDeleting: boolean;
 }) => {
   const { theme } = useTheme();
   const categoryColor = CategoryColors[post.category] || theme.primary;
@@ -147,8 +74,6 @@ const PostItem = ({
     );
   };
 
-  const typeIcon = post.type === "post" ? "file-text" : post.type === "reel" ? "film" : "clock";
-
   return (
     <Animated.View
       entering={FadeIn}
@@ -159,7 +84,7 @@ const PostItem = ({
         <View style={styles.postItemHeader}>
           <View style={styles.postItemLeft}>
             <View style={[styles.typeIcon, { backgroundColor: categoryColor + "20" }]}>
-              <Feather name={typeIcon} size={14} color={categoryColor} />
+              <Feather name="file-text" size={14} color={categoryColor} />
             </View>
             <View
               style={[
@@ -175,7 +100,7 @@ const PostItem = ({
             </View>
           </View>
           <ThemedText style={[styles.postTime, { color: theme.textTertiary }]}>
-            {post.timeAgo}
+            {formatTimeAgo(post.createdAt)}
           </ThemedText>
         </View>
 
@@ -189,9 +114,17 @@ const PostItem = ({
             <ThemedText style={[styles.statsText, { color: theme.textSecondary }]}>
               {post.upvotes}
             </ThemedText>
+            <Feather name="message-circle" size={14} color={theme.textSecondary} style={{ marginLeft: 12 }} />
+            <ThemedText style={[styles.statsText, { color: theme.textSecondary }]}>
+              {post.commentCount}
+            </ThemedText>
           </View>
-          <Pressable onPress={handleDelete} style={styles.deleteButton}>
-            <Feather name="trash-2" size={16} color={theme.downvote} />
+          <Pressable onPress={handleDelete} style={styles.deleteButton} disabled={isDeleting}>
+            {isDeleting ? (
+              <ActivityIndicator size="small" color={theme.downvote} />
+            ) : (
+              <Feather name="trash-2" size={16} color={theme.downvote} />
+            )}
           </Pressable>
         </View>
       </View>
@@ -202,24 +135,26 @@ const PostItem = ({
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
-  const [contentType, setContentType] = useState<ContentType>("posts");
-  const [posts, setPosts] = useState(MOCK_USER_POSTS);
+  const { user } = useAuth();
+  const { data, isLoading, refetch, isRefetching } = useUserPosts(user?.id);
+  const deletePostMutation = useDeletePost();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const tabBarHeight = 60 + insets.bottom;
 
-  const filteredPosts = posts.filter((post) => {
-    if (contentType === "posts") return post.type === "post";
-    if (contentType === "reels") return post.type === "reel";
-    return post.type === "story";
-  });
+  const posts = data?.posts || [];
 
-  const handleDeletePost = (postId: string) => {
-    setPosts((current) => current.filter((p) => p.id !== postId));
-  };
-
-  const stats = {
-    posts: posts.filter((p) => p.type === "post").length,
-    reels: posts.filter((p) => p.type === "reel").length,
-    stories: posts.filter((p) => p.type === "story").length,
+  const handleDeletePost = async (postId: string) => {
+    if (!user) return;
+    setDeletingId(postId);
+    try {
+      await deletePostMutation.mutateAsync({ postId, userId: user.id });
+      refetch();
+    } catch (error) {
+      console.error("Failed to delete post:", error);
+      Alert.alert("Error", "Failed to delete post. Please try again.");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   return (
@@ -236,6 +171,13 @@ export default function ProfileScreen() {
           paddingBottom: tabBarHeight + Spacing.xl,
         }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={refetch}
+            tintColor={theme.primary}
+          />
+        }
       >
         <View style={[styles.profileCard, { backgroundColor: theme.surface }]}>
           <View style={[styles.avatar, { backgroundColor: theme.primary }]}>
@@ -250,65 +192,36 @@ export default function ProfileScreen() {
 
           <View style={styles.statsContainer}>
             <View style={styles.statItem}>
-              <ThemedText type="h3">{stats.posts}</ThemedText>
+              <ThemedText type="h3">{posts.length}</ThemedText>
               <ThemedText style={[styles.statLabel, { color: theme.textSecondary }]}>
                 Posts
-              </ThemedText>
-            </View>
-            <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-            <View style={styles.statItem}>
-              <ThemedText type="h3">{stats.reels}</ThemedText>
-              <ThemedText style={[styles.statLabel, { color: theme.textSecondary }]}>
-                Reels
-              </ThemedText>
-            </View>
-            <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-            <View style={styles.statItem}>
-              <ThemedText type="h3">{stats.stories}</ThemedText>
-              <ThemedText style={[styles.statLabel, { color: theme.textSecondary }]}>
-                Stories
               </ThemedText>
             </View>
           </View>
         </View>
 
-        <View style={styles.segmentWrapper}>
-          <SegmentedControl
-            options={[
-              { key: "posts", label: "Posts", icon: "file-text" },
-              { key: "reels", label: "Reels", icon: "film" },
-              { key: "stories", label: "Stories", icon: "clock" },
-            ]}
-            selected={contentType}
-            onChange={setContentType}
-          />
-        </View>
-
         <View style={styles.postsList}>
-          {filteredPosts.length === 0 ? (
+          {isLoading ? (
+            <View style={styles.loadingState}>
+              <ActivityIndicator size="large" color={theme.primary} />
+            </View>
+          ) : posts.length === 0 ? (
             <View style={styles.emptyState}>
-              <Feather
-                name={contentType === "posts" ? "file-text" : contentType === "reels" ? "film" : "clock"}
-                size={48}
-                color={theme.textTertiary}
-              />
-              <ThemedText
-                style={[styles.emptyText, { color: theme.textSecondary }]}
-              >
-                No {contentType} yet
+              <Feather name="file-text" size={48} color={theme.textTertiary} />
+              <ThemedText style={[styles.emptyText, { color: theme.textSecondary }]}>
+                No posts yet
               </ThemedText>
-              <ThemedText
-                style={[styles.emptySubtext, { color: theme.textTertiary }]}
-              >
-                Your anonymous {contentType} will appear here
+              <ThemedText style={[styles.emptySubtext, { color: theme.textTertiary }]}>
+                Your anonymous posts will appear here
               </ThemedText>
             </View>
           ) : (
-            filteredPosts.map((post) => (
+            posts.map((post) => (
               <PostItem
                 key={post.id}
                 post={post}
                 onDelete={() => handleDeletePost(post.id)}
+                isDeleting={deletingId === post.id}
               />
             ))
           )}
@@ -366,32 +279,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: Spacing.xs,
   },
-  statDivider: {
-    width: 1,
-    height: 32,
-  },
-  segmentWrapper: {
-    paddingHorizontal: Spacing.md,
-    marginTop: Spacing.lg,
-  },
-  segmentedControl: {
-    flexDirection: "row",
-    borderRadius: BorderRadius.md,
-    padding: Spacing.xs,
-  },
-  segmentOption: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.sm,
-    gap: Spacing.xs,
-  },
-  segmentLabel: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
   postsList: {
     paddingHorizontal: Spacing.md,
     marginTop: Spacing.md,
@@ -400,6 +287,7 @@ const styles = StyleSheet.create({
   postItem: {
     padding: Spacing.md,
     borderRadius: BorderRadius.md,
+    marginBottom: Spacing.sm,
   },
   postItemHeader: {
     flexDirection: "row",
@@ -451,6 +339,10 @@ const styles = StyleSheet.create({
   },
   deleteButton: {
     padding: Spacing.xs,
+  },
+  loadingState: {
+    alignItems: "center",
+    paddingVertical: Spacing.xl * 2,
   },
   emptyState: {
     alignItems: "center",

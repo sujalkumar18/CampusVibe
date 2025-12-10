@@ -7,6 +7,7 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRoute, RouteProp } from "@react-navigation/native";
@@ -14,62 +15,31 @@ import { useHeaderHeight } from "@react-navigation/elements";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
   FadeIn,
 } from "react-native-reanimated";
 
 import { useTheme } from "@/hooks/useTheme";
-import { Colors, Spacing, BorderRadius, CategoryColors } from "@/constants/theme";
+import { useAuth } from "@/hooks/useAuth";
+import { usePost, useVote } from "@/hooks/usePosts";
+import { useComments, useCreateComment, type Comment } from "@/hooks/useComments";
+import { Spacing, BorderRadius, CategoryColors } from "@/constants/theme";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
 
-type Comment = {
-  id: string;
-  content: string;
-  upvotes: number;
-  timeAgo: string;
-};
+const formatTimeAgo = (dateString: string): string => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
 
-const MOCK_POST = {
-  id: "1",
-  content:
-    "Finally confessed to my crush in library yesterday. Heart was beating so fast! Waiting for the reply... This has been on my mind for months and I finally gathered the courage. Whatever happens, at least I tried.",
-  category: "confession" as const,
-  upvotes: 156,
-  downvotes: 12,
-  commentCount: 45,
-  timeAgo: "2h ago",
+  if (diffMins < 1) return "now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  return `${diffDays}d ago`;
 };
-
-const MOCK_COMMENTS: Comment[] = [
-  {
-    id: "1",
-    content: "Good luck! Rooting for you!",
-    upvotes: 23,
-    timeAgo: "1h ago",
-  },
-  {
-    id: "2",
-    content: "That takes courage. Proud of you!",
-    upvotes: 18,
-    timeAgo: "1h ago",
-  },
-  {
-    id: "3",
-    content: "Update us when you get the reply!",
-    upvotes: 15,
-    timeAgo: "45m ago",
-  },
-  {
-    id: "4",
-    content: "Been there, done that. It gets easier I promise",
-    upvotes: 12,
-    timeAgo: "30m ago",
-  },
-];
 
 const CommentItem = ({ comment }: { comment: Comment }) => {
   const { theme } = useTheme();
@@ -97,7 +67,7 @@ const CommentItem = ({ comment }: { comment: Comment }) => {
             Anonymous
           </ThemedText>
           <ThemedText style={[styles.commentTime, { color: theme.textTertiary }]}>
-            {comment.timeAgo}
+            {formatTimeAgo(comment.createdAt)}
           </ThemedText>
         </View>
         <ThemedText style={styles.commentContent}>{comment.content}</ThemedText>
@@ -126,69 +96,97 @@ export default function PostDetailScreen() {
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
   const route = useRoute<RouteProp<RootStackParamList, "PostDetail">>();
+  const { postId } = route.params;
+  const { user } = useAuth();
+
+  const { data: postData, isLoading: postLoading } = usePost(postId);
+  const { data: commentsData, isLoading: commentsLoading, refetch: refetchComments } = useComments(postId);
+  const createComment = useCreateComment();
+  const voteMutation = useVote();
 
   const [votes, setVotes] = useState({ up: false, down: false });
-  const [upvotes, setUpvotes] = useState(MOCK_POST.upvotes);
-  const [downvotes, setDownvotes] = useState(MOCK_POST.downvotes);
+  const [localUpvotes, setLocalUpvotes] = useState(0);
+  const [localDownvotes, setLocalDownvotes] = useState(0);
   const [newComment, setNewComment] = useState("");
-  const [comments, setComments] = useState(MOCK_COMMENTS);
 
-  const categoryColor = CategoryColors[MOCK_POST.category];
+  const post = postData?.post;
+  const comments = commentsData?.comments || [];
+  const categoryColor = post ? (CategoryColors[post.category] || theme.primary) : theme.primary;
+
+  React.useEffect(() => {
+    if (post) {
+      setLocalUpvotes(post.upvotes);
+      setLocalDownvotes(post.downvotes);
+    }
+  }, [post]);
 
   const handleUpvote = async () => {
+    if (!user || !post) return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (votes.up) {
       setVotes({ up: false, down: false });
-      setUpvotes((v) => v - 1);
+      setLocalUpvotes((v) => v - 1);
     } else {
-      if (votes.down) setDownvotes((v) => v - 1);
+      if (votes.down) setLocalDownvotes((v) => v - 1);
       setVotes({ up: true, down: false });
-      setUpvotes((v) => v + 1);
+      setLocalUpvotes((v) => v + 1);
     }
+    voteMutation.mutate({ userId: user.id, postId: post.id, voteType: 1 });
   };
 
   const handleDownvote = async () => {
+    if (!user || !post) return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (votes.down) {
       setVotes({ up: false, down: false });
-      setDownvotes((v) => v - 1);
+      setLocalDownvotes((v) => v - 1);
     } else {
-      if (votes.up) setUpvotes((v) => v - 1);
+      if (votes.up) setLocalUpvotes((v) => v - 1);
       setVotes({ up: false, down: true });
-      setDownvotes((v) => v + 1);
+      setLocalDownvotes((v) => v + 1);
     }
+    voteMutation.mutate({ userId: user.id, postId: post.id, voteType: -1 });
   };
 
   const handleSubmitComment = async () => {
-    if (!newComment.trim()) return;
+    if (!newComment.trim() || !user || !post) return;
 
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-    const comment: Comment = {
-      id: Date.now().toString(),
-      content: newComment.trim(),
-      upvotes: 0,
-      timeAgo: "Just now",
-    };
-
-    setComments([comment, ...comments]);
-    setNewComment("");
+    try {
+      await createComment.mutateAsync({
+        userId: user.id,
+        postId: post.id,
+        content: newComment.trim(),
+      });
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setNewComment("");
+      refetchComments();
+    } catch (error) {
+      console.error("Failed to create comment:", error);
+    }
   };
+
+  if (postLoading || !post) {
+    return (
+      <ThemedView style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color={theme.primary} />
+      </ThemedView>
+    );
+  }
 
   const renderHeader = () => (
     <View style={styles.postContainer}>
       <View style={styles.postHeader}>
         <View style={[styles.categoryChip, { backgroundColor: categoryColor + "33" }]}>
           <ThemedText style={[styles.categoryText, { color: categoryColor }]}>
-            {MOCK_POST.category.charAt(0).toUpperCase() + MOCK_POST.category.slice(1)}
+            {post.category.charAt(0).toUpperCase() + post.category.slice(1)}
           </ThemedText>
         </View>
         <ThemedText style={[styles.timeAgo, { color: theme.textTertiary }]}>
-          {MOCK_POST.timeAgo}
+          {formatTimeAgo(post.createdAt)}
         </ThemedText>
       </View>
 
-      <ThemedText style={styles.postContent}>{MOCK_POST.content}</ThemedText>
+      <ThemedText style={styles.postContent}>{post.content}</ThemedText>
 
       <View style={styles.postActions}>
         <Pressable onPress={handleUpvote} style={styles.voteButton}>
@@ -203,7 +201,7 @@ export default function PostDetailScreen() {
               { color: votes.up ? theme.upvote : theme.textSecondary },
             ]}
           >
-            {upvotes}
+            {localUpvotes}
           </ThemedText>
         </Pressable>
 
@@ -219,7 +217,7 @@ export default function PostDetailScreen() {
               { color: votes.down ? theme.downvote : theme.textSecondary },
             ]}
           >
-            {downvotes}
+            {localDownvotes}
           </ThemedText>
         </Pressable>
 
@@ -262,6 +260,15 @@ export default function PostDetailScreen() {
           }}
           showsVerticalScrollIndicator={false}
           ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}
+          ListEmptyComponent={() => (
+            commentsLoading ? (
+              <ActivityIndicator size="small" color={theme.primary} />
+            ) : (
+              <ThemedText style={[styles.noComments, { color: theme.textSecondary }]}>
+                No comments yet. Be the first!
+              </ThemedText>
+            )
+          )}
         />
 
         <View
@@ -296,13 +303,17 @@ export default function PostDetailScreen() {
                   : theme.surface,
               },
             ]}
-            disabled={!newComment.trim()}
+            disabled={!newComment.trim() || createComment.isPending}
           >
-            <Feather
-              name="send"
-              size={18}
-              color={newComment.trim() ? "#FFFFFF" : theme.textTertiary}
-            />
+            {createComment.isPending ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Feather
+                name="send"
+                size={18}
+                color={newComment.trim() ? "#FFFFFF" : theme.textTertiary}
+              />
+            )}
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -313,6 +324,10 @@ export default function PostDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  centered: {
+    justifyContent: "center",
+    alignItems: "center",
   },
   keyboardView: {
     flex: 1,
@@ -407,6 +422,10 @@ const styles = StyleSheet.create({
   },
   commentUpvoteCount: {
     fontSize: 12,
+  },
+  noComments: {
+    textAlign: "center",
+    paddingVertical: Spacing.lg,
   },
   inputContainer: {
     flexDirection: "row",

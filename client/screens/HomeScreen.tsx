@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from "react";
-import { View, FlatList, StyleSheet, RefreshControl, Pressable } from "react-native";
+import React, { useState, useCallback, useEffect } from "react";
+import { View, FlatList, StyleSheet, RefreshControl, Pressable, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -12,69 +12,26 @@ import Animated, {
 import * as Haptics from "expo-haptics";
 
 import { useTheme } from "@/hooks/useTheme";
+import { useAuth } from "@/hooks/useAuth";
+import { usePosts, useVote, type Post } from "@/hooks/usePosts";
 import { Colors, Spacing, BorderRadius, CategoryColors } from "@/constants/theme";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
 
-type Post = {
-  id: string;
-  content: string;
-  category: "confession" | "crush" | "meme" | "rant" | "compliment";
-  upvotes: number;
-  downvotes: number;
-  commentCount: number;
-  timeAgo: string;
-  imageUrl?: string;
-};
+const formatTimeAgo = (dateString: string): string => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
 
-const MOCK_POSTS: Post[] = [
-  {
-    id: "1",
-    content: "Finally confessed to my crush in library yesterday. Heart was beating so fast! Waiting for the reply...",
-    category: "confession",
-    upvotes: 156,
-    downvotes: 12,
-    commentCount: 45,
-    timeAgo: "2h ago",
-  },
-  {
-    id: "2",
-    content: "That person in CS101 who always sits in the front row... you're amazing and your notes are always perfect!",
-    category: "crush",
-    upvotes: 89,
-    downvotes: 5,
-    commentCount: 23,
-    timeAgo: "4h ago",
-  },
-  {
-    id: "3",
-    content: "WiFi in hostel is slower than my will to attend 8 AM lectures",
-    category: "meme",
-    upvotes: 342,
-    downvotes: 8,
-    commentCount: 67,
-    timeAgo: "5h ago",
-  },
-  {
-    id: "4",
-    content: "Why do professors assign 5 assignments due on the same day? Do they think we're robots?!",
-    category: "rant",
-    upvotes: 234,
-    downvotes: 15,
-    commentCount: 89,
-    timeAgo: "6h ago",
-  },
-  {
-    id: "5",
-    content: "Shoutout to the senior who helped me find my way on the first day. You're a real one!",
-    category: "compliment",
-    upvotes: 178,
-    downvotes: 2,
-    commentCount: 12,
-    timeAgo: "8h ago",
-  },
-];
+  if (diffMins < 1) return "now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  return `${diffDays}d ago`;
+};
 
 const CategoryChip = ({ category }: { category: string }) => {
   const color = CategoryColors[category] || Colors.dark.primary;
@@ -144,13 +101,24 @@ const VoteButton = ({
   );
 };
 
-const PostCard = ({ post, onPress }: { post: Post; onPress: () => void }) => {
+const PostCard = ({ 
+  post, 
+  onPress,
+  userId,
+  onVote,
+}: { 
+  post: Post; 
+  onPress: () => void;
+  userId?: string;
+  onVote: (postId: string, voteType: 1 | -1) => void;
+}) => {
   const { theme } = useTheme();
   const [votes, setVotes] = useState({ up: false, down: false });
   const [upvotes, setUpvotes] = useState(post.upvotes);
   const [downvotes, setDownvotes] = useState(post.downvotes);
 
   const handleUpvote = () => {
+    if (!userId) return;
     if (votes.up) {
       setVotes({ up: false, down: false });
       setUpvotes((v) => v - 1);
@@ -159,9 +127,11 @@ const PostCard = ({ post, onPress }: { post: Post; onPress: () => void }) => {
       setVotes({ up: true, down: false });
       setUpvotes((v) => v + 1);
     }
+    onVote(post.id, 1);
   };
 
   const handleDownvote = () => {
+    if (!userId) return;
     if (votes.down) {
       setVotes({ up: false, down: false });
       setDownvotes((v) => v - 1);
@@ -170,6 +140,7 @@ const PostCard = ({ post, onPress }: { post: Post; onPress: () => void }) => {
       setVotes({ up: false, down: true });
       setDownvotes((v) => v + 1);
     }
+    onVote(post.id, -1);
   };
 
   return (
@@ -178,7 +149,7 @@ const PostCard = ({ post, onPress }: { post: Post; onPress: () => void }) => {
         <View style={styles.postHeader}>
           <CategoryChip category={post.category} />
           <ThemedText style={[styles.timeAgo, { color: theme.textTertiary }]}>
-            {post.timeAgo}
+            {formatTimeAgo(post.createdAt)}
           </ThemedText>
         </View>
 
@@ -214,23 +185,32 @@ const PostCard = ({ post, onPress }: { post: Post; onPress: () => void }) => {
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const { theme, isDark } = useTheme();
+  const { theme } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const [refreshing, setRefreshing] = useState(false);
-  const [posts, setPosts] = useState(MOCK_POSTS);
-
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1000);
-  }, []);
+  const { user } = useAuth();
+  const { data, isLoading, refetch, isRefetching } = usePosts();
+  const voteMutation = useVote();
 
   const handlePostPress = (postId: string) => {
     navigation.navigate("PostDetail", { postId });
   };
 
+  const handleVote = (postId: string, voteType: 1 | -1) => {
+    if (!user) return;
+    voteMutation.mutate({ userId: user.id, postId, voteType });
+  };
+
   const tabBarHeight = 60 + insets.bottom;
+
+  if (isLoading) {
+    return (
+      <ThemedView style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color={theme.primary} />
+      </ThemedView>
+    );
+  }
+
+  const posts = data?.posts || [];
 
   return (
     <ThemedView style={styles.container}>
@@ -247,7 +227,12 @@ export default function HomeScreen() {
         data={posts}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <PostCard post={item} onPress={() => handlePostPress(item.id)} />
+          <PostCard 
+            post={item} 
+            onPress={() => handlePostPress(item.id)}
+            userId={user?.id}
+            onVote={handleVote}
+          />
         )}
         contentContainerStyle={{
           paddingTop: Spacing.md,
@@ -257,13 +242,21 @@ export default function HomeScreen() {
         scrollIndicatorInsets={{ bottom: insets.bottom }}
         refreshControl={
           <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
+            refreshing={isRefetching}
+            onRefresh={refetch}
             tintColor={theme.primary}
           />
         }
         showsVerticalScrollIndicator={false}
         ItemSeparatorComponent={() => <View style={{ height: Spacing.md }} />}
+        ListEmptyComponent={() => (
+          <View style={styles.emptyState}>
+            <Feather name="message-square" size={48} color={theme.textTertiary} />
+            <ThemedText style={[styles.emptyText, { color: theme.textSecondary }]}>
+              No posts yet. Be the first to share!
+            </ThemedText>
+          </View>
+        )}
       />
     </ThemedView>
   );
@@ -272,6 +265,10 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  centered: {
+    justifyContent: "center",
+    alignItems: "center",
   },
   header: {
     paddingHorizontal: Spacing.md,
@@ -336,5 +333,15 @@ const styles = StyleSheet.create({
   },
   commentCount: {
     fontSize: 14,
+  },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 100,
+    gap: Spacing.md,
+  },
+  emptyText: {
+    fontSize: 16,
+    textAlign: "center",
   },
 });
