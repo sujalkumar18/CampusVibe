@@ -25,6 +25,7 @@ import { Colors, Spacing, BorderRadius, CategoryColors } from "@/constants/theme
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
+import { useStories, Story as APIStory } from "@/hooks/useStories";
 
 const { width, height } = Dimensions.get("window");
 
@@ -37,56 +38,29 @@ type Story = {
   viewed: boolean;
 };
 
-const MOCK_STORIES: Story[] = [
-  {
-    id: "1",
-    category: "confession",
-    content: "I secretly water the plants in the common room because no one else does",
-    timeRemaining: "23h left",
-    backgroundColor: "#6C5CE7",
-    viewed: false,
-  },
-  {
-    id: "2",
-    category: "meme",
-    content: "POV: You're the only one who did the assignment and prof decides to make it a group discussion",
-    timeRemaining: "20h left",
-    backgroundColor: "#FFA502",
-    viewed: false,
-  },
-  {
-    id: "3",
-    category: "crush",
-    content: "You with the blue headphones in the library... your playlist must be amazing",
-    timeRemaining: "18h left",
-    backgroundColor: "#FF3E4D",
-    viewed: true,
-  },
-  {
-    id: "4",
-    category: "rant",
-    content: "Canteen raised chai price AGAIN. This is getting out of hand.",
-    timeRemaining: "15h left",
-    backgroundColor: "#A29BFE",
-    viewed: true,
-  },
-  {
-    id: "5",
-    category: "compliment",
-    content: "To our batch topper - you're inspiring, not intimidating. Keep shining!",
-    timeRemaining: "12h left",
-    backgroundColor: "#00D2D3",
-    viewed: false,
-  },
-  {
-    id: "6",
-    category: "meme",
-    content: "When attendance is 74% and you need 75% to sit in exams",
-    timeRemaining: "8h left",
-    backgroundColor: "#1B4332",
-    viewed: true,
-  },
+const BACKGROUND_COLORS = [
+  "#6C5CE7", "#FF6B9D", "#00B894", "#FFA502", "#00D2D3", "#1B4332", "#4A1942", "#1A365D"
 ];
+
+const getTimeRemaining = (expiresAt: string): string => {
+  const now = new Date();
+  const expires = new Date(expiresAt);
+  const diff = expires.getTime() - now.getTime();
+  if (diff <= 0) return "Expired";
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  if (hours > 0) return `${hours}h left`;
+  const minutes = Math.floor(diff / (1000 * 60));
+  return `${minutes}m left`;
+};
+
+const mapAPIStoryToStory = (apiStory: APIStory, index: number): Story => ({
+  id: apiStory.id,
+  category: "confession",
+  content: apiStory.caption || "Story",
+  timeRemaining: getTimeRemaining(apiStory.expiresAt),
+  backgroundColor: BACKGROUND_COLORS[index % BACKGROUND_COLORS.length],
+  viewed: false,
+});
 
 const StoryRing = ({
   story,
@@ -292,6 +266,9 @@ export default function StoriesScreen() {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const tabBarHeight = 60 + insets.bottom;
 
+  const { data, isLoading, refetch } = useStories();
+  const stories: Story[] = (data?.stories || []).map(mapAPIStoryToStory);
+
   const handleStoryPress = (index: number) => {
     setSelectedIndex(index);
     setViewerVisible(true);
@@ -329,13 +306,23 @@ export default function StoriesScreen() {
             </ThemedText>
           </Pressable>
 
-          {MOCK_STORIES.map((story, index) => (
-            <StoryRing
-              key={story.id}
-              story={story}
-              onPress={() => handleStoryPress(index)}
-            />
-          ))}
+          {isLoading ? (
+            <ThemedText style={{ color: theme.textSecondary, marginLeft: Spacing.md }}>
+              Loading...
+            </ThemedText>
+          ) : stories.length === 0 ? (
+            <ThemedText style={{ color: theme.textSecondary, marginLeft: Spacing.md }}>
+              No stories yet. Be the first!
+            </ThemedText>
+          ) : (
+            stories.map((story, index) => (
+              <StoryRing
+                key={story.id}
+                story={story}
+                onPress={() => handleStoryPress(index)}
+              />
+            ))
+          )}
         </ScrollView>
 
         <View style={styles.recentSection}>
@@ -347,60 +334,70 @@ export default function StoriesScreen() {
           </ThemedText>
         </View>
 
-        {MOCK_STORIES.map((story, index) => (
-          <Pressable
-            key={story.id}
-            onPress={() => handleStoryPress(index)}
-            style={({ pressed }) => [
-              styles.storyListItem,
-              {
-                backgroundColor: theme.surface,
-                opacity: pressed ? 0.7 : 1,
-              },
-            ]}
-          >
-            <View
-              style={[
-                styles.storyListAvatar,
-                { backgroundColor: story.backgroundColor },
+        {isLoading ? (
+          <ThemedText style={{ color: theme.textSecondary, textAlign: 'center', padding: Spacing.lg }}>
+            Loading stories...
+          </ThemedText>
+        ) : stories.length === 0 ? (
+          <ThemedText style={{ color: theme.textSecondary, textAlign: 'center', padding: Spacing.lg }}>
+            No stories yet. Create the first story!
+          </ThemedText>
+        ) : (
+          stories.map((story, index) => (
+            <Pressable
+              key={story.id}
+              onPress={() => handleStoryPress(index)}
+              style={({ pressed }) => [
+                styles.storyListItem,
+                {
+                  backgroundColor: theme.surface,
+                  opacity: pressed ? 0.7 : 1,
+                },
               ]}
             >
-              <Feather name="user" size={20} color="#FFFFFF" />
-            </View>
-            <View style={styles.storyListContent}>
-              <View style={styles.storyListHeader}>
-                <View
-                  style={[
-                    styles.miniCategoryChip,
-                    { backgroundColor: CategoryColors[story.category] + "33" },
-                  ]}
-                >
-                  <ThemedText
+              <View
+                style={[
+                  styles.storyListAvatar,
+                  { backgroundColor: story.backgroundColor },
+                ]}
+              >
+                <Feather name="user" size={20} color="#FFFFFF" />
+              </View>
+              <View style={styles.storyListContent}>
+                <View style={styles.storyListHeader}>
+                  <View
                     style={[
-                      styles.miniCategoryText,
-                      { color: CategoryColors[story.category] },
+                      styles.miniCategoryChip,
+                      { backgroundColor: CategoryColors[story.category] + "33" },
                     ]}
                   >
-                    {story.category}
+                    <ThemedText
+                      style={[
+                        styles.miniCategoryText,
+                        { color: CategoryColors[story.category] },
+                      ]}
+                    >
+                      {story.category}
+                    </ThemedText>
+                  </View>
+                  <ThemedText style={[styles.timeRemaining, { color: theme.textTertiary }]}>
+                    {story.timeRemaining}
                   </ThemedText>
                 </View>
-                <ThemedText style={[styles.timeRemaining, { color: theme.textTertiary }]}>
-                  {story.timeRemaining}
+                <ThemedText numberOfLines={2} style={styles.storyPreview}>
+                  {story.content}
                 </ThemedText>
               </View>
-              <ThemedText numberOfLines={2} style={styles.storyPreview}>
-                {story.content}
-              </ThemedText>
-            </View>
-            {!story.viewed && (
-              <View style={[styles.unreadDot, { backgroundColor: theme.primary }]} />
-            )}
-          </Pressable>
-        ))}
+              {!story.viewed && (
+                <View style={[styles.unreadDot, { backgroundColor: theme.primary }]} />
+              )}
+            </Pressable>
+          ))
+        )}
       </ScrollView>
 
       <StoryViewer
-        stories={MOCK_STORIES}
+        stories={stories}
         initialIndex={selectedIndex}
         visible={viewerVisible}
         onClose={() => setViewerVisible(false)}

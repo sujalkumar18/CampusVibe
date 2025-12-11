@@ -19,6 +19,8 @@ import { useTheme } from "@/hooks/useTheme";
 import { Colors, Spacing, BorderRadius, CategoryColors } from "@/constants/theme";
 import { ThemedText } from "@/components/ThemedText";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
+import { useCreateStory } from "@/hooks/useStories";
+import { useAuth } from "@/hooks/useAuth";
 
 type Category = "confession" | "crush" | "meme" | "rant" | "compliment";
 
@@ -45,13 +47,16 @@ export default function CreateStoryScreen() {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { user } = useAuth();
+  const createStory = useCreateStory();
 
   const [text, setText] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [backgroundColor, setBackgroundColor] = useState(COLORS[0]);
   const [imageUri, setImageUri] = useState<string | null>(null);
+  const [isPosting, setIsPosting] = useState(false);
 
-  const canPost = (text.trim().length > 0 || imageUri) && selectedCategory !== null;
+  const canPost = (text.trim().length > 0 || imageUri) && selectedCategory !== null && !isPosting;
 
   const handlePickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -67,16 +72,29 @@ export default function CreateStoryScreen() {
   };
 
   const handlePost = async () => {
-    if (!canPost) return;
+    if (!canPost || !user?.id) return;
 
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    
-    Alert.alert("Story Posted!", "Your anonymous story will be visible for 24 hours.", [
-      {
-        text: "OK",
-        onPress: () => navigation.goBack(),
-      },
-    ]);
+    setIsPosting(true);
+    try {
+      await createStory.mutateAsync({
+        userId: user.id,
+        imageUrl: imageUri || backgroundColor,
+        caption: text.trim() || undefined,
+      });
+
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      
+      Alert.alert("Story Posted!", "Your anonymous story will be visible for 24 hours.", [
+        {
+          text: "OK",
+          onPress: () => navigation.goBack(),
+        },
+      ]);
+    } catch (error) {
+      Alert.alert("Error", "Failed to post story. Please try again.");
+    } finally {
+      setIsPosting(false);
+    }
   };
 
   const handleClose = () => {
