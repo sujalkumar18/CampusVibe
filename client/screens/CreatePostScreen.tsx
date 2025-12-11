@@ -156,7 +156,7 @@ export default function CreatePostScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+    <View style={[styles.container, { backgroundColor: theme.backgroundRoot, paddingTop: insets.top }]}>
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} style={styles.headerButton}>
           <ThemedText style={{ color: theme.textSecondary }}>Cancel</ThemedText>

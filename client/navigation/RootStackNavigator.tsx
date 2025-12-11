@@ -32,7 +32,7 @@ export default function RootStackNavigator() {
         component={CreatePostScreen}
         options={{
           presentation: "modal",
-          headerTitle: "New Post",
+          headerShown: false,
         }}
       />
       <Stack.Screen
