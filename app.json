@@ -4,6 +4,9 @@
       "eas": {
         "projectId": "0646745d-e2ac-4b67-b742-539a593a82d5"
       }
+    },
+    "android": {
+      "package": "com.campusvibe.app"
     }
   }
 }
