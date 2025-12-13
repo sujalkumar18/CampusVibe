@@ -2,7 +2,7 @@ import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import MainTabNavigator from "@/navigation/MainTabNavigator";
 import CreatePostScreen from "@/screens/CreatePostScreen";
-import CreateReelScreen from "@/screens/CreateReelScreen";
+import CreatePollScreen from "@/screens/CreatePollScreen";
 import CreateStoryScreen from "@/screens/CreateStoryScreen";
 import PostDetailScreen from "@/screens/PostDetailScreen";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
@@ -10,7 +10,7 @@ import { useScreenOptions } from "@/hooks/useScreenOptions";
 export type RootStackParamList = {
   Main: undefined;
   CreatePost: undefined;
-  CreateReel: undefined;
+  CreatePoll: undefined;
   CreateStory: undefined;
   PostDetail: { postId: string };
 };
@@ -36,10 +36,10 @@ export default function RootStackNavigator() {
         }}
       />
       <Stack.Screen
-        name="CreateReel"
-        component={CreateReelScreen}
+        name="CreatePoll"
+        component={CreatePollScreen}
         options={{
-          presentation: "fullScreenModal",
+          presentation: "modal",
           headerShown: false,
         }}
       />

@@ -62,18 +62,34 @@ export const stories = pgTable("stories", {
   expiresAt: timestamp("expires_at").notNull(),
 });
 
-export const reels = pgTable("reels", {
+export const polls = pgTable("polls", {
   id: varchar("id")
     .primaryKey()
     .default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id).notNull(),
-  videoUrl: text("video_url").notNull(),
-  thumbnailUrl: text("thumbnail_url"),
-  description: text("description"),
+  question: text("question").notNull(),
   category: categoryEnum("category").notNull(),
-  upvotes: integer("upvotes").default(0).notNull(),
-  downvotes: integer("downvotes").default(0).notNull(),
-  viewCount: integer("view_count").default(0).notNull(),
+  totalVotes: integer("total_votes").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at"),
+});
+
+export const pollOptions = pgTable("poll_options", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  pollId: varchar("poll_id").references(() => polls.id, { onDelete: 'cascade' }).notNull(),
+  optionText: text("option_text").notNull(),
+  voteCount: integer("vote_count").default(0).notNull(),
+});
+
+export const pollVotes = pgTable("poll_votes", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  pollId: varchar("poll_id").references(() => polls.id, { onDelete: 'cascade' }).notNull(),
+  optionId: varchar("option_id").references(() => pollOptions.id, { onDelete: 'cascade' }).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -97,11 +113,11 @@ export const insertStorySchema = createInsertSchema(stories).pick({
   caption: true,
 });
 
-export const insertReelSchema = createInsertSchema(reels).pick({
-  videoUrl: true,
-  thumbnailUrl: true,
-  description: true,
-  category: true,
+export const insertPollSchema = z.object({
+  question: z.string().min(1),
+  category: z.enum(['confession', 'crush', 'meme', 'rant', 'compliment']),
+  options: z.array(z.string().min(1)).min(2).max(6),
+  expiresInHours: z.number().optional(),
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -113,6 +129,8 @@ export type InsertComment = z.infer<typeof insertCommentSchema>;
 export type Vote = typeof votes.$inferSelect;
 export type Story = typeof stories.$inferSelect;
 export type InsertStory = z.infer<typeof insertStorySchema>;
-export type Reel = typeof reels.$inferSelect;
-export type InsertReel = z.infer<typeof insertReelSchema>;
+export type Poll = typeof polls.$inferSelect;
+export type PollOption = typeof pollOptions.$inferSelect;
+export type PollVote = typeof pollVotes.$inferSelect;
+export type InsertPoll = z.infer<typeof insertPollSchema>;
 export type Category = 'confession' | 'crush' | 'meme' | 'rant' | 'compliment';

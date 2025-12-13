@@ -13,7 +13,7 @@ import Animated, {
 } from "react-native-reanimated";
 
 import HomeScreen from "@/screens/HomeScreen";
-import ReelsScreen from "@/screens/ReelsScreen";
+import PollsScreen from "@/screens/PollsScreen";
 import StoriesScreen from "@/screens/StoriesScreen";
 import ProfileScreen from "@/screens/ProfileScreen";
 import { useTheme } from "@/hooks/useTheme";
@@ -22,7 +22,7 @@ import { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 export type MainTabParamList = {
   HomeTab: undefined;
-  ReelsTab: undefined;
+  PollsTab: undefined;
   CreateTab: undefined;
   StoriesTab: undefined;
   ProfileTab: undefined;
@@ -117,11 +117,11 @@ export default function MainTabNavigator() {
         }}
       />
       <Tab.Screen
-        name="ReelsTab"
-        component={ReelsScreen}
+        name="PollsTab"
+        component={PollsScreen}
         options={{
           tabBarIcon: ({ color, size }) => (
-            <Feather name="film" size={size} color={color} />
+            <Feather name="bar-chart-2" size={size} color={color} />
           ),
         }}
       />
