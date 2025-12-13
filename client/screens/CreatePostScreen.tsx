@@ -24,6 +24,7 @@ import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollV
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/hooks/useAuth";
 import { useCreatePost } from "@/hooks/usePosts";
+import { useUpload } from "@/hooks/useUpload";
 import { Spacing, BorderRadius, CategoryColors } from "@/constants/theme";
 import { ThemedText } from "@/components/ThemedText";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
@@ -102,12 +103,14 @@ export default function CreatePostScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { user } = useAuth();
   const createPost = useCreatePost();
+  const uploadFile = useUpload();
 
   const [content, setContent] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [images, setImages] = useState<string[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
 
-  const canPost = content.trim().length > 0 && selectedCategory !== null && !createPost.isPending;
+  const canPost = content.trim().length > 0 && selectedCategory !== null && !createPost.isPending && !isUploading;
   const charsLeft = MAX_CHARS - content.length;
 
   const handlePickImage = async () => {
@@ -132,11 +135,23 @@ export default function CreatePostScreen() {
     if (!canPost || !user || !selectedCategory) return;
 
     try {
+      setIsUploading(true);
+      let uploadedImageUrl: string | undefined;
+
+      if (images.length > 0) {
+        const uploadResult = await uploadFile.mutateAsync({
+          uri: images[0],
+          type: 'image/jpeg',
+          name: `post-${Date.now()}.jpg`,
+        });
+        uploadedImageUrl = uploadResult.url;
+      }
+
       await createPost.mutateAsync({
         userId: user.id,
         content: content.trim(),
         category: selectedCategory,
-        imageUrl: images.length > 0 ? images[0] : undefined,
+        imageUrl: uploadedImageUrl,
       });
 
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -144,6 +159,8 @@ export default function CreatePostScreen() {
     } catch (error) {
       console.error("Failed to create post:", error);
       Alert.alert("Error", "Failed to create post. Please try again.");
+    } finally {
+      setIsUploading(false);
     }
   };
 

@@ -6,6 +6,7 @@ import {
   Pressable,
   FlatList,
   ViewToken,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -19,56 +20,17 @@ import * as Haptics from "expo-haptics";
 import { useTheme } from "@/hooks/useTheme";
 import { Colors, Spacing, BorderRadius, CategoryColors } from "@/constants/theme";
 import { ThemedText } from "@/components/ThemedText";
+import { useReels, useViewReel, type Reel } from "@/hooks/useReels";
 
 const { width, height } = Dimensions.get("window");
 
-type Reel = {
-  id: string;
-  category: "confession" | "crush" | "meme" | "rant" | "compliment";
-  upvotes: number;
-  downvotes: number;
-  commentCount: number;
-  description: string;
-  backgroundColor: string;
-};
-
-const MOCK_REELS: Reel[] = [
-  {
-    id: "1",
-    category: "meme",
-    upvotes: 1234,
-    downvotes: 45,
-    commentCount: 234,
-    description: "When professor says 'This won't be on the exam' but it's 50% of the paper",
-    backgroundColor: "#2D1B69",
-  },
-  {
-    id: "2",
-    category: "confession",
-    upvotes: 892,
-    downvotes: 23,
-    commentCount: 156,
-    description: "I've been secretly leaving motivational notes in library books for strangers to find",
-    backgroundColor: "#1B4332",
-  },
-  {
-    id: "3",
-    category: "crush",
-    upvotes: 567,
-    downvotes: 12,
-    commentCount: 89,
-    description: "To the person who smiled at me in the cafeteria today - you made my day",
-    backgroundColor: "#4A1942",
-  },
-  {
-    id: "4",
-    category: "rant",
-    upvotes: 2341,
-    downvotes: 89,
-    commentCount: 445,
-    description: "Hostel water heater broke again in winter. Day 5 of cold showers.",
-    backgroundColor: "#1A365D",
-  },
+const BACKGROUND_COLORS = [
+  "#2D1B69",
+  "#1B4332",
+  "#4A1942",
+  "#1A365D",
+  "#6C3483",
+  "#0E4D64",
 ];
 
 const ActionButton = ({
@@ -120,12 +82,20 @@ const formatCount = (count: number): string => {
   return count.toString();
 };
 
-const ReelItem = ({ reel, isActive }: { reel: Reel; isActive: boolean }) => {
+const ReelItem = ({ reel, isActive, index }: { reel: Reel; isActive: boolean; index: number }) => {
   const insets = useSafeAreaInsets();
+  const viewReel = useViewReel();
   const [votes, setVotes] = useState({ up: false, down: false });
   const [upvotes, setUpvotes] = useState(reel.upvotes);
   const [downvotes, setDownvotes] = useState(reel.downvotes);
   const tabBarHeight = 60 + insets.bottom;
+  const backgroundColor = BACKGROUND_COLORS[index % BACKGROUND_COLORS.length];
+
+  React.useEffect(() => {
+    if (isActive) {
+      viewReel.mutate(reel.id);
+    }
+  }, [isActive, reel.id]);
 
   const handleUpvote = () => {
     if (votes.up) {
@@ -159,7 +129,7 @@ const ReelItem = ({ reel, isActive }: { reel: Reel; isActive: boolean }) => {
   };
 
   return (
-    <View style={[styles.reelContainer, { backgroundColor: reel.backgroundColor }]}>
+    <View style={[styles.reelContainer, { backgroundColor }]}>
       <View style={[styles.categoryBadge, { top: insets.top + Spacing.md }]}>
         <View style={[styles.categoryChip, { backgroundColor: categoryColor + "40" }]}>
           <ThemedText style={[styles.categoryText, { color: categoryColor }]}>
@@ -168,8 +138,13 @@ const ReelItem = ({ reel, isActive }: { reel: Reel; isActive: boolean }) => {
         </View>
       </View>
 
+      <View style={styles.videoPlaceholder}>
+        <Feather name="play-circle" size={64} color="rgba(255,255,255,0.3)" />
+      </View>
+
       <View style={[styles.contentOverlay, { bottom: tabBarHeight + Spacing.xl }]}>
-        <ThemedText style={styles.description}>{reel.description}</ThemedText>
+        <ThemedText style={styles.description}>{reel.description || "No description"}</ThemedText>
+        <ThemedText style={styles.viewCount}>{reel.viewCount} views</ThemedText>
       </View>
 
       <View style={[styles.actionsContainer, { bottom: tabBarHeight + Spacing.xl }]}>
@@ -189,7 +164,7 @@ const ReelItem = ({ reel, isActive }: { reel: Reel; isActive: boolean }) => {
         />
         <ActionButton
           icon="message-circle"
-          count={reel.commentCount}
+          count={0}
           onPress={() => {}}
         />
         <ActionButton icon="share" count={0} onPress={() => {}} />
@@ -198,10 +173,26 @@ const ReelItem = ({ reel, isActive }: { reel: Reel; isActive: boolean }) => {
   );
 };
 
+const EmptyReels = () => {
+  const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
+  
+  return (
+    <View style={[styles.emptyContainer, { paddingTop: insets.top }]}>
+      <Feather name="video-off" size={64} color={theme.textTertiary} />
+      <ThemedText style={[styles.emptyTitle, { color: theme.text }]}>No Reels Yet</ThemedText>
+      <ThemedText style={[styles.emptyText, { color: theme.textSecondary }]}>
+        Be the first to share an anonymous video with your campus!
+      </ThemedText>
+    </View>
+  );
+};
+
 export default function ReelsScreen() {
   const insets = useSafeAreaInsets();
   const [activeIndex, setActiveIndex] = useState(0);
-  const tabBarHeight = 60 + insets.bottom;
+  const { data, isLoading } = useReels();
+  const reels = data?.reels || [];
 
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
@@ -215,13 +206,25 @@ export default function ReelsScreen() {
     itemVisiblePercentThreshold: 50,
   }).current;
 
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <ActivityIndicator size="large" color="#FFFFFF" />
+      </View>
+    );
+  }
+
+  if (reels.length === 0) {
+    return <EmptyReels />;
+  }
+
   return (
     <View style={styles.container}>
       <FlatList
-        data={MOCK_REELS}
+        data={reels}
         keyExtractor={(item) => item.id}
         renderItem={({ item, index }) => (
-          <ReelItem reel={item} isActive={index === activeIndex} />
+          <ReelItem reel={item} isActive={index === activeIndex} index={index} />
         )}
         pagingEnabled
         showsVerticalScrollIndicator={false}
@@ -245,9 +248,35 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#000",
   },
+  loadingContainer: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  emptyContainer: {
+    flex: 1,
+    backgroundColor: "#000",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: Spacing.xl,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    marginTop: Spacing.lg,
+  },
+  emptyText: {
+    fontSize: 15,
+    textAlign: "center",
+    marginTop: Spacing.sm,
+  },
   reelContainer: {
     width,
     height,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  videoPlaceholder: {
+    position: "absolute",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -276,6 +305,11 @@ const styles = StyleSheet.create({
     textShadowColor: "rgba(0,0,0,0.5)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
+  },
+  viewCount: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 12,
+    marginTop: Spacing.xs,
   },
   actionsContainer: {
     position: "absolute",

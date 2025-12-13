@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import {
   View,
   StyleSheet,
@@ -6,6 +6,7 @@ import {
   TextInput,
   Alert,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
@@ -23,9 +24,12 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { useTheme } from "@/hooks/useTheme";
-import { Colors, Spacing, BorderRadius, CategoryColors } from "@/constants/theme";
+import { Spacing, BorderRadius, CategoryColors } from "@/constants/theme";
 import { ThemedText } from "@/components/ThemedText";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
+import { useCreateReel } from "@/hooks/useReels";
+import { useAuth } from "@/hooks/useAuth";
+import { useUpload } from "@/hooks/useUpload";
 
 type Category = "confession" | "crush" | "meme" | "rant" | "compliment";
 
@@ -41,18 +45,20 @@ export default function CreateReelScreen() {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { user } = useAuth();
+  const createReel = useCreateReel();
+  const uploadFile = useUpload();
 
   const [isRecording, setIsRecording] = useState(false);
-  const [hasVideo, setHasVideo] = useState(false);
+  const [videoUri, setVideoUri] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [description, setDescription] = useState("");
+  const [isPosting, setIsPosting] = useState(false);
 
   const recordScale = useSharedValue(1);
-  const recordOpacity = useSharedValue(1);
 
   const animatedRecordStyle = useAnimatedStyle(() => ({
     transform: [{ scale: recordScale.value }],
-    opacity: recordOpacity.value,
   }));
 
   const handleStartRecording = async () => {
@@ -71,7 +77,6 @@ export default function CreateReelScreen() {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsRecording(false);
     recordScale.value = withSpring(1);
-    setHasVideo(true);
   };
 
   const handlePickVideo = async () => {
@@ -82,26 +87,47 @@ export default function CreateReelScreen() {
       quality: 0.8,
     });
 
-    if (!result.canceled) {
-      setHasVideo(true);
+    if (!result.canceled && result.assets[0]) {
+      setVideoUri(result.assets[0].uri);
     }
   };
 
   const handlePost = async () => {
-    if (!hasVideo || !selectedCategory) return;
+    if (!videoUri || !selectedCategory || !user?.id) return;
 
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    
-    Alert.alert("Posted!", "Your anonymous reel has been shared with the campus.", [
-      {
-        text: "OK",
-        onPress: () => navigation.goBack(),
-      },
-    ]);
+    setIsPosting(true);
+    try {
+      const uploadResult = await uploadFile.mutateAsync({
+        uri: videoUri,
+        type: 'video/mp4',
+        name: `reel-${Date.now()}.mp4`,
+      });
+
+      await createReel.mutateAsync({
+        userId: user.id,
+        videoUrl: uploadResult.url,
+        description: description.trim() || undefined,
+        category: selectedCategory,
+      });
+
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      
+      Alert.alert("Reel Posted!", "Your anonymous reel has been shared with the campus.", [
+        {
+          text: "OK",
+          onPress: () => navigation.goBack(),
+        },
+      ]);
+    } catch (error) {
+      console.error("Failed to create reel:", error);
+      Alert.alert("Error", "Failed to post reel. Please try again.");
+    } finally {
+      setIsPosting(false);
+    }
   };
 
   const handleClose = () => {
-    if (hasVideo) {
+    if (videoUri) {
       Alert.alert(
         "Discard Reel?",
         "Are you sure you want to discard this reel?",
@@ -119,7 +145,7 @@ export default function CreateReelScreen() {
     }
   };
 
-  if (hasVideo) {
+  if (videoUri) {
     return (
       <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
         <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
@@ -133,26 +159,30 @@ export default function CreateReelScreen() {
               styles.postButton,
               {
                 backgroundColor:
-                  selectedCategory ? theme.primary : theme.surface,
+                  selectedCategory && !isPosting ? theme.primary : theme.surface,
               },
             ]}
-            disabled={!selectedCategory}
+            disabled={!selectedCategory || isPosting}
           >
-            <ThemedText
-              style={{
-                color: selectedCategory ? "#FFFFFF" : theme.textTertiary,
-                fontWeight: "600",
-              }}
-            >
-              Post
-            </ThemedText>
+            {isPosting ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <ThemedText
+                style={{
+                  color: selectedCategory ? "#FFFFFF" : theme.textTertiary,
+                  fontWeight: "600",
+                }}
+              >
+                Post
+              </ThemedText>
+            )}
           </Pressable>
         </View>
 
         <View style={styles.previewContainer}>
           <View style={[styles.videoPreview, { backgroundColor: "#2D1B69" }]}>
             <Feather name="play-circle" size={48} color="rgba(255,255,255,0.5)" />
-            <ThemedText style={styles.previewText}>Video Preview</ThemedText>
+            <ThemedText style={styles.previewText}>Video Selected</ThemedText>
           </View>
         </View>
 
@@ -266,7 +296,7 @@ export default function CreateReelScreen() {
 
       <View style={styles.timerContainer}>
         <ThemedText style={styles.timerText}>
-          {isRecording ? "Recording..." : "Hold to record (max 60s)"}
+          {isRecording ? "Recording..." : "Hold to record or pick a video"}
         </ThemedText>
       </View>
     </View>
@@ -291,6 +321,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.full,
+    minWidth: 60,
+    alignItems: "center",
   },
   cameraOverlay: {
     position: "absolute",
