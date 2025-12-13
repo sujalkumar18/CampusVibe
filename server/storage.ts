@@ -1,6 +1,6 @@
 import { db } from "./db";
-import { users, posts, comments, votes, stories } from "../shared/schema";
-import type { User, Post, Comment, Vote, Story, InsertPost, InsertComment, InsertStory, Category } from "../shared/schema";
+import { users, posts, comments, votes, stories, reels } from "../shared/schema";
+import type { User, Post, Comment, Vote, Story, Reel, InsertPost, InsertComment, InsertStory, InsertReel, Category } from "../shared/schema";
 import { eq, desc, and, sql, gt } from "drizzle-orm";
 
 export interface IStorage {
@@ -22,6 +22,12 @@ export interface IStorage {
   getActiveStories(): Promise<Story[]>;
   createStory(userId: string, story: InsertStory): Promise<Story>;
   viewStory(storyId: string): Promise<void>;
+  
+  getReels(category?: Category): Promise<Reel[]>;
+  getReelById(id: string): Promise<Reel | undefined>;
+  createReel(userId: string, reel: InsertReel): Promise<Reel>;
+  deleteReel(id: string, userId: string): Promise<boolean>;
+  viewReel(reelId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -205,6 +211,38 @@ export class DatabaseStorage implements IStorage {
 
   async viewStory(storyId: string): Promise<void> {
     await db.update(stories).set({ viewCount: sql`${stories.viewCount} + 1` }).where(eq(stories.id, storyId));
+  }
+
+  async getReels(category?: Category): Promise<Reel[]> {
+    if (category) {
+      return db.select().from(reels).where(eq(reels.category, category)).orderBy(desc(reels.createdAt));
+    }
+    return db.select().from(reels).orderBy(desc(reels.createdAt));
+  }
+
+  async getReelById(id: string): Promise<Reel | undefined> {
+    const result = await db.select().from(reels).where(eq(reels.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createReel(userId: string, reel: InsertReel): Promise<Reel> {
+    const [newReel] = await db.insert(reels).values({
+      userId,
+      videoUrl: reel.videoUrl,
+      thumbnailUrl: reel.thumbnailUrl,
+      description: reel.description,
+      category: reel.category,
+    }).returning();
+    return newReel;
+  }
+
+  async deleteReel(id: string, userId: string): Promise<boolean> {
+    const result = await db.delete(reels).where(and(eq(reels.id, id), eq(reels.userId, userId))).returning();
+    return result.length > 0;
+  }
+
+  async viewReel(reelId: string): Promise<void> {
+    await db.update(reels).set({ viewCount: sql`${reels.viewCount} + 1` }).where(eq(reels.id, reelId));
   }
 }
 

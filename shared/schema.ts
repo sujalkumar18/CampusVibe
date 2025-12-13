@@ -62,6 +62,21 @@ export const stories = pgTable("stories", {
   expiresAt: timestamp("expires_at").notNull(),
 });
 
+export const reels = pgTable("reels", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  videoUrl: text("video_url").notNull(),
+  thumbnailUrl: text("thumbnail_url"),
+  description: text("description"),
+  category: categoryEnum("category").notNull(),
+  upvotes: integer("upvotes").default(0).notNull(),
+  downvotes: integer("downvotes").default(0).notNull(),
+  viewCount: integer("view_count").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   deviceId: true,
 });
@@ -82,6 +97,13 @@ export const insertStorySchema = createInsertSchema(stories).pick({
   caption: true,
 });
 
+export const insertReelSchema = createInsertSchema(reels).pick({
+  videoUrl: true,
+  thumbnailUrl: true,
+  description: true,
+  category: true,
+});
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type Post = typeof posts.$inferSelect;
@@ -91,4 +113,6 @@ export type InsertComment = z.infer<typeof insertCommentSchema>;
 export type Vote = typeof votes.$inferSelect;
 export type Story = typeof stories.$inferSelect;
 export type InsertStory = z.infer<typeof insertStorySchema>;
+export type Reel = typeof reels.$inferSelect;
+export type InsertReel = z.infer<typeof insertReelSchema>;
 export type Category = 'confession' | 'crush' | 'meme' | 'rant' | 'compliment';
