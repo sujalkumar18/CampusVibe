@@ -1,6 +1,6 @@
 import { db } from "./db";
-import { users, posts, comments, votes, stories, reels } from "../shared/schema";
-import type { User, Post, Comment, Vote, Story, Reel, InsertPost, InsertComment, InsertStory, InsertReel, Category } from "../shared/schema";
+import { users, posts, comments, votes, stories, polls, pollOptions, pollVotes } from "../shared/schema";
+import type { User, Post, Comment, Vote, Story, Poll, PollOption, PollVote, InsertPost, InsertComment, InsertStory, InsertPoll, Category } from "../shared/schema";
 import { eq, desc, and, sql, gt } from "drizzle-orm";
 
 export interface IStorage {
@@ -23,11 +23,10 @@ export interface IStorage {
   createStory(userId: string, story: InsertStory): Promise<Story>;
   viewStory(storyId: string): Promise<void>;
   
-  getReels(category?: Category): Promise<Reel[]>;
-  getReelById(id: string): Promise<Reel | undefined>;
-  createReel(userId: string, reel: InsertReel): Promise<Reel>;
-  deleteReel(id: string, userId: string): Promise<boolean>;
-  viewReel(reelId: string): Promise<void>;
+  getPolls(category?: Category, userId?: string): Promise<(Poll & { options: PollOption[]; userVotedOptionId?: string | null })[]>;
+  createPoll(userId: string, poll: InsertPoll): Promise<Poll & { options: PollOption[] }>;
+  votePoll(userId: string, pollId: string, optionId: string): Promise<{ success: boolean }>;
+  deletePoll(id: string, userId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -213,36 +212,86 @@ export class DatabaseStorage implements IStorage {
     await db.update(stories).set({ viewCount: sql`${stories.viewCount} + 1` }).where(eq(stories.id, storyId));
   }
 
-  async getReels(category?: Category): Promise<Reel[]> {
+  async getPolls(category?: Category, userId?: string): Promise<(Poll & { options: PollOption[]; userVotedOptionId?: string | null })[]> {
+    let pollsList: Poll[];
     if (category) {
-      return db.select().from(reels).where(eq(reels.category, category)).orderBy(desc(reels.createdAt));
+      pollsList = await db.select().from(polls).where(eq(polls.category, category)).orderBy(desc(polls.createdAt));
+    } else {
+      pollsList = await db.select().from(polls).orderBy(desc(polls.createdAt));
     }
-    return db.select().from(reels).orderBy(desc(reels.createdAt));
+
+    const result = await Promise.all(pollsList.map(async (poll) => {
+      const options = await db.select().from(pollOptions).where(eq(pollOptions.pollId, poll.id));
+      let userVotedOptionId: string | null = null;
+      
+      if (userId) {
+        const userVote = await db.select().from(pollVotes)
+          .where(and(eq(pollVotes.pollId, poll.id), eq(pollVotes.userId, userId)))
+          .limit(1);
+        if (userVote.length > 0) {
+          userVotedOptionId = userVote[0].optionId;
+        }
+      }
+      
+      return { ...poll, options, userVotedOptionId };
+    }));
+
+    return result;
   }
 
-  async getReelById(id: string): Promise<Reel | undefined> {
-    const result = await db.select().from(reels).where(eq(reels.id, id)).limit(1);
-    return result[0];
-  }
+  async createPoll(userId: string, poll: InsertPoll): Promise<Poll & { options: PollOption[] }> {
+    const expiresAt = poll.expiresInHours 
+      ? new Date(Date.now() + poll.expiresInHours * 60 * 60 * 1000)
+      : null;
 
-  async createReel(userId: string, reel: InsertReel): Promise<Reel> {
-    const [newReel] = await db.insert(reels).values({
+    const [newPoll] = await db.insert(polls).values({
       userId,
-      videoUrl: reel.videoUrl,
-      thumbnailUrl: reel.thumbnailUrl,
-      description: reel.description,
-      category: reel.category,
+      question: poll.question,
+      category: poll.category,
+      expiresAt,
     }).returning();
-    return newReel;
+
+    const createdOptions: PollOption[] = [];
+    for (const optionText of poll.options) {
+      const [option] = await db.insert(pollOptions).values({
+        pollId: newPoll.id,
+        optionText,
+      }).returning();
+      createdOptions.push(option);
+    }
+
+    return { ...newPoll, options: createdOptions };
   }
 
-  async deleteReel(id: string, userId: string): Promise<boolean> {
-    const result = await db.delete(reels).where(and(eq(reels.id, id), eq(reels.userId, userId))).returning();
+  async votePoll(userId: string, pollId: string, optionId: string): Promise<{ success: boolean }> {
+    const existingVote = await db.select().from(pollVotes)
+      .where(and(eq(pollVotes.pollId, pollId), eq(pollVotes.userId, userId)))
+      .limit(1);
+
+    if (existingVote.length > 0) {
+      return { success: false };
+    }
+
+    await db.insert(pollVotes).values({
+      pollId,
+      optionId,
+      userId,
+    });
+
+    await db.update(pollOptions)
+      .set({ voteCount: sql`${pollOptions.voteCount} + 1` })
+      .where(eq(pollOptions.id, optionId));
+
+    await db.update(polls)
+      .set({ totalVotes: sql`${polls.totalVotes} + 1` })
+      .where(eq(polls.id, pollId));
+
+    return { success: true };
+  }
+
+  async deletePoll(id: string, userId: string): Promise<boolean> {
+    const result = await db.delete(polls).where(and(eq(polls.id, id), eq(polls.userId, userId))).returning();
     return result.length > 0;
-  }
-
-  async viewReel(reelId: string): Promise<void> {
-    await db.update(reels).set({ viewCount: sql`${reels.viewCount} + 1` }).where(eq(reels.id, reelId));
   }
 }
 

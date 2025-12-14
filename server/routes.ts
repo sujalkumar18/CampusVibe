@@ -4,7 +4,7 @@ import multer from "multer";
 import * as path from "path";
 import * as fs from "fs";
 import { storage } from "./storage";
-import { insertPostSchema, insertCommentSchema, insertStorySchema, insertReelSchema } from "../shared/schema";
+import { insertPostSchema, insertCommentSchema, insertStorySchema, insertPollSchema } from "../shared/schema";
 import type { Category } from "../shared/schema";
 
 const uploadsDir = path.resolve(process.cwd(), "uploads");
@@ -263,71 +263,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/reels", async (req, res) => {
+  app.get("/api/polls", async (req, res) => {
     try {
       const category = req.query.category as Category | undefined;
-      const reels = await storage.getReels(category);
-      res.json({ reels });
+      const userId = req.query.userId as string | undefined;
+      const pollsList = await storage.getPolls(category, userId);
+      res.json({ polls: pollsList });
     } catch (error) {
-      console.error("Get reels error:", error);
+      console.error("Get polls error:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
 
-  app.get("/api/reels/:id", async (req, res) => {
+  app.post("/api/polls", async (req, res) => {
     try {
-      const reel = await storage.getReelById(req.params.id);
-      if (!reel) {
-        return res.status(404).json({ error: "Reel not found" });
-      }
-      res.json({ reel });
-    } catch (error) {
-      console.error("Get reel error:", error);
-      res.status(500).json({ error: "Internal server error" });
-    }
-  });
-
-  app.post("/api/reels", async (req, res) => {
-    try {
-      const { userId, ...reelData } = req.body;
+      const { userId, ...pollData } = req.body;
       if (!userId) {
         return res.status(400).json({ error: "userId is required" });
       }
-      const parsed = insertReelSchema.safeParse(reelData);
+      const parsed = insertPollSchema.safeParse(pollData);
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.message });
       }
-      const reel = await storage.createReel(userId, parsed.data);
-      res.json({ reel });
+      const poll = await storage.createPoll(userId, parsed.data);
+      res.json({ poll });
     } catch (error) {
-      console.error("Create reel error:", error);
+      console.error("Create poll error:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
 
-  app.delete("/api/reels/:id", async (req, res) => {
+  app.post("/api/polls/vote", async (req, res) => {
+    try {
+      const { pollId, optionId, userId } = req.body;
+      if (!pollId || !optionId || !userId) {
+        return res.status(400).json({ error: "pollId, optionId, and userId are required" });
+      }
+      const result = await storage.votePoll(userId, pollId, optionId);
+      if (!result.success) {
+        return res.status(400).json({ error: "You have already voted on this poll" });
+      }
+      res.json(result);
+    } catch (error) {
+      console.error("Vote poll error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/polls/:id", async (req, res) => {
     try {
       const { userId } = req.body;
       if (!userId) {
         return res.status(400).json({ error: "userId is required" });
       }
-      const deleted = await storage.deleteReel(req.params.id, userId);
+      const deleted = await storage.deletePoll(req.params.id, userId);
       if (!deleted) {
-        return res.status(404).json({ error: "Reel not found or unauthorized" });
+        return res.status(404).json({ error: "Poll not found or unauthorized" });
       }
       res.json({ success: true });
     } catch (error) {
-      console.error("Delete reel error:", error);
-      res.status(500).json({ error: "Internal server error" });
-    }
-  });
-
-  app.post("/api/reels/:id/view", async (req, res) => {
-    try {
-      await storage.viewReel(req.params.id);
-      res.json({ success: true });
-    } catch (error) {
-      console.error("View reel error:", error);
+      console.error("Delete poll error:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
