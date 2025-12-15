@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { View, FlatList, StyleSheet, RefreshControl, Pressable, ActivityIndicator } from "react-native";
+import React from "react";
+import { View, FlatList, StyleSheet, RefreshControl, Pressable, ActivityIndicator, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -13,7 +13,7 @@ import * as Haptics from "expo-haptics";
 
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/hooks/useAuth";
-import { usePolls, useVotePoll, type Poll } from "@/hooks/usePolls";
+import { usePolls, useVotePoll, useDeletePoll, type Poll } from "@/hooks/usePolls";
 import { Colors, Spacing, BorderRadius, CategoryColors } from "@/constants/theme";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
@@ -89,7 +89,7 @@ const PollOptionItem = ({
         style={[
           styles.pollOption,
           {
-            backgroundColor: theme.cardBackground,
+            backgroundColor: theme.surface,
             borderColor: isSelected ? Colors.dark.primary : theme.border,
             borderWidth: isSelected ? 2 : 1,
           },
@@ -129,21 +129,31 @@ const PollCard = ({
   poll,
   userId,
   onVote,
+  onDelete,
 }: {
   poll: Poll;
   userId?: string;
   onVote: (pollId: string, optionId: string) => void;
+  onDelete: (pollId: string) => void;
 }) => {
   const { theme } = useTheme();
   const hasVoted = !!poll.userVotedOptionId;
+  const isOwner = userId && poll.userId === userId;
 
   return (
-    <View style={[styles.pollCard, { backgroundColor: theme.cardBackground }]}>
+    <View style={[styles.pollCard, { backgroundColor: theme.surface }]}>
       <View style={styles.pollHeader}>
         <CategoryChip category={poll.category} />
-        <ThemedText style={[styles.timeAgo, { color: theme.textSecondary }]}>
-          {formatTimeAgo(poll.createdAt)}
-        </ThemedText>
+        <View style={styles.pollHeaderRight}>
+          <ThemedText style={[styles.timeAgo, { color: theme.textSecondary }]}>
+            {formatTimeAgo(poll.createdAt)}
+          </ThemedText>
+          {isOwner && (
+            <Pressable onPress={() => onDelete(poll.id)} style={styles.pollDeleteButton} hitSlop={8}>
+              <Feather name="trash-2" size={16} color="#FF6B6B" />
+            </Pressable>
+          )}
+        </View>
       </View>
       
       <ThemedText style={styles.pollQuestion}>{poll.question}</ThemedText>
@@ -200,6 +210,7 @@ export default function PollsScreen() {
   const { user } = useAuth();
   const { data, isLoading, refetch, isRefetching } = usePolls();
   const votePoll = useVotePoll();
+  const deletePoll = useDeletePoll();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const polls = data?.polls || [];
 
@@ -214,6 +225,30 @@ export default function PollsScreen() {
     } catch (error) {
       console.error("Vote error:", error);
     }
+  };
+
+  const handleDeletePoll = (pollId: string) => {
+    if (!user?.id) return;
+    
+    Alert.alert(
+      "Delete Poll",
+      "Are you sure you want to delete this poll? All votes will be lost.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deletePoll.mutateAsync({ pollId, userId: user.id });
+              await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } catch (error) {
+              Alert.alert("Error", "Failed to delete poll.");
+            }
+          },
+        },
+      ]
+    );
   };
 
   if (isLoading) {
@@ -243,7 +278,7 @@ export default function PollsScreen() {
           data={polls}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <PollCard poll={item} userId={user?.id} onVote={handleVote} />
+            <PollCard poll={item} userId={user?.id} onVote={handleVote} onDelete={handleDeletePoll} />
           )}
           contentContainerStyle={styles.listContent}
           refreshControl={
@@ -300,6 +335,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: Spacing.md,
+  },
+  pollHeaderRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  pollDeleteButton: {
+    padding: Spacing.xs,
   },
   categoryChip: {
     paddingHorizontal: Spacing.sm,

@@ -6,6 +6,7 @@ import {
   Pressable,
   Dimensions,
   Modal,
+  Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
@@ -19,18 +20,21 @@ import Animated, {
   runOnJS,
 } from "react-native-reanimated";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import * as Haptics from "expo-haptics";
 
 import { useTheme } from "@/hooks/useTheme";
+import { useAuth } from "@/hooks/useAuth";
 import { Colors, Spacing, BorderRadius, CategoryColors } from "@/constants/theme";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
-import { useStories, Story as APIStory } from "@/hooks/useStories";
+import { useStories, useDeleteStory, Story as APIStory } from "@/hooks/useStories";
 
 const { width, height } = Dimensions.get("window");
 
 type Story = {
   id: string;
+  userId: string;
   category: "confession" | "crush" | "meme" | "rant" | "compliment";
   content: string;
   timeRemaining: string;
@@ -55,6 +59,7 @@ const getTimeRemaining = (expiresAt: string): string => {
 
 const mapAPIStoryToStory = (apiStory: APIStory, index: number): Story => ({
   id: apiStory.id,
+  userId: apiStory.userId,
   category: "confession",
   content: apiStory.caption || "Story",
   timeRemaining: getTimeRemaining(apiStory.expiresAt),
@@ -125,11 +130,15 @@ const StoryViewer = ({
   initialIndex,
   visible,
   onClose,
+  currentUserId,
+  onDelete,
 }: {
   stories: Story[];
   initialIndex: number;
   visible: boolean;
   onClose: () => void;
+  currentUserId?: string;
+  onDelete: (storyId: string) => void;
 }) => {
   const insets = useSafeAreaInsets();
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
@@ -233,9 +242,19 @@ const StoryViewer = ({
                   </ThemedText>
                 </View>
               </View>
-              <Pressable onPress={onClose} style={styles.closeButton}>
-                <Feather name="x" size={24} color="#FFFFFF" />
-              </Pressable>
+              <View style={styles.headerActions}>
+                {currentUserId && currentStory.userId === currentUserId && (
+                  <Pressable 
+                    onPress={() => onDelete(currentStory.id)} 
+                    style={styles.deleteButton}
+                  >
+                    <Feather name="trash-2" size={20} color="#FF6B6B" />
+                  </Pressable>
+                )}
+                <Pressable onPress={onClose} style={styles.closeButton}>
+                  <Feather name="x" size={24} color="#FFFFFF" />
+                </Pressable>
+              </View>
             </View>
           </View>
 
@@ -261,13 +280,40 @@ const StoryViewer = ({
 export default function StoriesScreen() {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
+  const { user } = useAuth();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [viewerVisible, setViewerVisible] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const tabBarHeight = 60 + insets.bottom;
 
   const { data, isLoading, refetch } = useStories();
+  const deleteStory = useDeleteStory();
   const stories: Story[] = (data?.stories || []).map(mapAPIStoryToStory);
+
+  const handleDeleteStory = async (storyId: string) => {
+    if (!user?.id) return;
+    
+    Alert.alert(
+      "Delete Story",
+      "Are you sure you want to delete this story?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteStory.mutateAsync({ storyId, userId: user.id });
+              await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              setViewerVisible(false);
+            } catch (error) {
+              Alert.alert("Error", "Failed to delete story.");
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const handleStoryPress = (index: number) => {
     setSelectedIndex(index);
@@ -388,6 +434,18 @@ export default function StoriesScreen() {
                   {story.content}
                 </ThemedText>
               </View>
+              {user?.id === story.userId && (
+                <Pressable
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleDeleteStory(story.id);
+                  }}
+                  style={styles.listDeleteButton}
+                  hitSlop={8}
+                >
+                  <Feather name="trash-2" size={18} color="#FF6B6B" />
+                </Pressable>
+              )}
               {!story.viewed && (
                 <View style={[styles.unreadDot, { backgroundColor: theme.primary }]} />
               )}
@@ -401,6 +459,8 @@ export default function StoriesScreen() {
         initialIndex={selectedIndex}
         visible={viewerVisible}
         onClose={() => setViewerVisible(false)}
+        currentUserId={user?.id}
+        onDelete={handleDeleteStory}
       />
     </ThemedView>
   );
@@ -566,7 +626,20 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.7)",
     fontSize: 12,
   },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  deleteButton: {
+    padding: Spacing.xs,
+    backgroundColor: "rgba(255,107,107,0.2)",
+    borderRadius: BorderRadius.full,
+  },
   closeButton: {
+    padding: Spacing.xs,
+  },
+  listDeleteButton: {
     padding: Spacing.xs,
   },
   storyContent: {

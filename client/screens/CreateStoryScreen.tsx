@@ -5,7 +5,7 @@ import {
   Pressable,
   TextInput,
   Alert,
-  Platform,
+  Dimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
@@ -14,6 +14,13 @@ import { Feather } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
+import { Video, ResizeMode } from "expo-av";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from "react-native-reanimated";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius, CategoryColors } from "@/constants/theme";
@@ -24,6 +31,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUpload } from "@/hooks/useUpload";
 
 type Category = "confession" | "crush" | "meme" | "rant" | "compliment";
+
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 const CATEGORIES: { key: Category; label: string }[] = [
   { key: "confession", label: "Confession" },
@@ -55,21 +64,43 @@ export default function CreateStoryScreen() {
   const [text, setText] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [backgroundColor, setBackgroundColor] = useState(COLORS[0]);
-  const [imageUri, setImageUri] = useState<string | null>(null);
+  const [mediaUri, setMediaUri] = useState<string | null>(null);
+  const [mediaType, setMediaType] = useState<"image" | "video" | null>(null);
   const [isPosting, setIsPosting] = useState(false);
 
-  const canPost = (text.trim().length > 0 || imageUri) && selectedCategory !== null && !isPosting;
+  const textTranslateY = useSharedValue(0);
+  const savedTranslateY = useSharedValue(0);
 
-  const handlePickImage = async () => {
+  const canPost = (text.trim().length > 0 || mediaUri) && selectedCategory !== null && !isPosting;
+
+  const panGesture = Gesture.Pan()
+    .onUpdate((event) => {
+      const newY = savedTranslateY.value + event.translationY;
+      const maxY = SCREEN_HEIGHT * 0.3;
+      const minY = -SCREEN_HEIGHT * 0.3;
+      textTranslateY.value = Math.max(minY, Math.min(maxY, newY));
+    })
+    .onEnd(() => {
+      savedTranslateY.value = textTranslateY.value;
+    });
+
+  const animatedTextStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: textTranslateY.value }],
+  }));
+
+  const handlePickMedia = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ImagePicker.MediaTypeOptions.All,
       allowsEditing: true,
       aspect: [9, 16],
       quality: 0.8,
+      videoMaxDuration: 30,
     });
 
     if (!result.canceled) {
-      setImageUri(result.assets[0].uri);
+      const asset = result.assets[0];
+      setMediaUri(asset.uri);
+      setMediaType(asset.type === "video" ? "video" : "image");
     }
   };
 
@@ -78,20 +109,21 @@ export default function CreateStoryScreen() {
 
     setIsPosting(true);
     try {
-      let storyImageUrl: string = backgroundColor;
+      let storyMediaUrl: string = backgroundColor;
 
-      if (imageUri) {
+      if (mediaUri) {
+        const isVideo = mediaType === "video";
         const uploadResult = await uploadFile.mutateAsync({
-          uri: imageUri,
-          type: 'image/jpeg',
-          name: `story-${Date.now()}.jpg`,
+          uri: mediaUri,
+          type: isVideo ? 'video/mp4' : 'image/jpeg',
+          name: `story-${Date.now()}.${isVideo ? 'mp4' : 'jpg'}`,
         });
-        storyImageUrl = uploadResult.url;
+        storyMediaUrl = uploadResult.url;
       }
 
       await createStory.mutateAsync({
         userId: user.id,
-        imageUrl: storyImageUrl,
+        imageUrl: storyMediaUrl,
         caption: text.trim() || undefined,
       });
 
@@ -111,7 +143,7 @@ export default function CreateStoryScreen() {
   };
 
   const handleClose = () => {
-    if (text.trim().length > 0 || imageUri) {
+    if (text.trim().length > 0 || mediaUri) {
       Alert.alert(
         "Discard Story?",
         "Are you sure you want to discard this story?",
@@ -129,10 +161,25 @@ export default function CreateStoryScreen() {
     }
   };
 
+  const handleClearMedia = () => {
+    setMediaUri(null);
+    setMediaType(null);
+  };
+
   return (
     <View style={[styles.container, { backgroundColor }]}>
-      {imageUri && (
-        <Image source={{ uri: imageUri }} style={styles.backgroundImage} />
+      {mediaUri && mediaType === "image" && (
+        <Image source={{ uri: mediaUri }} style={styles.backgroundMedia} contentFit="cover" />
+      )}
+      {mediaUri && mediaType === "video" && (
+        <Video
+          source={{ uri: mediaUri }}
+          style={styles.backgroundMedia}
+          resizeMode={ResizeMode.COVER}
+          shouldPlay
+          isLooping
+          isMuted
+        />
       )}
 
       <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
@@ -157,41 +204,47 @@ export default function CreateStoryScreen() {
               fontWeight: "600",
             }}
           >
-            Share Story
+            {isPosting ? "Posting..." : "Share Story"}
           </ThemedText>
         </Pressable>
       </View>
 
-      <View style={styles.contentContainer}>
-        {selectedCategory && (
-          <View
-            style={[
-              styles.categoryBadge,
-              { backgroundColor: CategoryColors[selectedCategory] + "60" },
-            ]}
-          >
-            <ThemedText
+      <GestureDetector gesture={panGesture}>
+        <Animated.View style={[styles.contentContainer, animatedTextStyle]}>
+          {selectedCategory && (
+            <View
               style={[
-                styles.categoryBadgeText,
-                { color: CategoryColors[selectedCategory] },
+                styles.categoryBadge,
+                { backgroundColor: CategoryColors[selectedCategory] + "60" },
               ]}
             >
-              {selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)}
-            </ThemedText>
-          </View>
-        )}
+              <ThemedText
+                style={[
+                  styles.categoryBadgeText,
+                  { color: CategoryColors[selectedCategory] },
+                ]}
+              >
+                {selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)}
+              </ThemedText>
+            </View>
+          )}
 
-        <TextInput
-          style={styles.textInput}
-          placeholder="Type something..."
-          placeholderTextColor="rgba(255,255,255,0.5)"
-          value={text}
-          onChangeText={setText}
-          multiline
-          maxLength={200}
-          textAlign="center"
-        />
-      </View>
+          <TextInput
+            style={styles.textInput}
+            placeholder="Type something..."
+            placeholderTextColor="rgba(255,255,255,0.5)"
+            value={text}
+            onChangeText={setText}
+            multiline
+            maxLength={200}
+            textAlign="center"
+          />
+          
+          <ThemedText style={styles.dragHint}>
+            Drag to move text
+          </ThemedText>
+        </Animated.View>
+      </GestureDetector>
 
       <View style={[styles.bottomControls, { paddingBottom: insets.bottom + Spacing.lg }]}>
         <View style={styles.colorPicker}>
@@ -200,12 +253,12 @@ export default function CreateStoryScreen() {
               key={color}
               onPress={() => {
                 setBackgroundColor(color);
-                setImageUri(null);
+                handleClearMedia();
               }}
               style={[
                 styles.colorOption,
                 { backgroundColor: color },
-                backgroundColor === color && !imageUri && styles.colorSelected,
+                backgroundColor === color && !mediaUri && styles.colorSelected,
               ]}
             />
           ))}
@@ -242,10 +295,15 @@ export default function CreateStoryScreen() {
         </View>
 
         <View style={styles.actionRow}>
-          <Pressable onPress={handlePickImage} style={styles.actionButton}>
+          <Pressable onPress={handlePickMedia} style={styles.actionButton}>
             <Feather name="image" size={24} color="#FFFFFF" />
-            <ThemedText style={styles.actionText}>Add Photo</ThemedText>
+            <ThemedText style={styles.actionText}>Add Photo/Video</ThemedText>
           </Pressable>
+          {mediaUri && (
+            <Pressable onPress={handleClearMedia} style={styles.clearButton}>
+              <Feather name="x-circle" size={20} color="#FF6B6B" />
+            </Pressable>
+          )}
         </View>
       </View>
     </View>
@@ -256,15 +314,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  backgroundImage: {
+  backgroundMedia: {
     ...StyleSheet.absoluteFillObject,
-    opacity: 0.8,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: Spacing.md,
+    zIndex: 10,
   },
   headerButton: {
     padding: Spacing.sm,
@@ -294,11 +352,20 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "600",
     color: "#FFFFFF",
-    textShadowColor: "rgba(0,0,0,0.3)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+    textShadowColor: "rgba(0,0,0,0.5)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 6,
     maxWidth: "100%",
     minWidth: 200,
+    backgroundColor: "rgba(0,0,0,0.2)",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+  },
+  dragHint: {
+    color: "rgba(255,255,255,0.5)",
+    fontSize: 12,
+    marginTop: Spacing.md,
   },
   bottomControls: {
     paddingHorizontal: Spacing.md,
@@ -346,6 +413,8 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: "row",
     justifyContent: "center",
+    alignItems: "center",
+    gap: Spacing.sm,
   },
   actionButton: {
     flexDirection: "row",
@@ -360,5 +429,8 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "500",
+  },
+  clearButton: {
+    padding: Spacing.sm,
   },
 });
