@@ -80,3 +80,11 @@ export function useDeletePoll() {
     },
   });
 }
+
+export function useUserPolls(userId: string | undefined) {
+  return useQuery<{ polls: Poll[] }>({
+    queryKey: ['api', 'users', userId, 'polls'],
+    enabled: !!userId,
+    refetchOnMount: true,
+  });
+}

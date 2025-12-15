@@ -109,15 +109,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/posts", async (req, res) => {
     try {
-      const { userId, ...postData } = req.body;
+      const { userId, expiresInHours, ...postData } = req.body;
       if (!userId) {
         return res.status(400).json({ error: "userId is required" });
       }
-      const parsed = insertPostSchema.safeParse(postData);
+      const parsed = insertPostSchema.safeParse({ ...postData, expiresInHours });
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.message });
       }
-      const post = await storage.createPost(userId, parsed.data);
+      const post = await storage.createPost(userId, parsed.data, expiresInHours);
       res.json({ post });
     } catch (error) {
       console.error("Create post error:", error);
@@ -259,6 +259,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error) {
       console.error("View story error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/stories/:id", async (req, res) => {
+    try {
+      const { userId } = req.body;
+      if (!userId) {
+        return res.status(400).json({ error: "userId is required" });
+      }
+      const deleted = await storage.deleteStory(req.params.id, userId);
+      if (!deleted) {
+        return res.status(404).json({ error: "Story not found or unauthorized" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Delete story error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/users/:userId/polls", async (req, res) => {
+    try {
+      const polls = await storage.getUserPolls(req.params.userId);
+      res.json({ polls });
+    } catch (error) {
+      console.error("Get user polls error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/users/:userId/stories", async (req, res) => {
+    try {
+      const stories = await storage.getUserStories(req.params.userId);
+      res.json({ stories });
+    } catch (error) {
+      console.error("Get user stories error:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });

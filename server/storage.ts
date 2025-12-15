@@ -9,8 +9,11 @@ export interface IStorage {
   getPosts(category?: Category): Promise<Post[]>;
   getPostById(id: string): Promise<Post | undefined>;
   getUserPosts(userId: string): Promise<Post[]>;
-  createPost(userId: string, post: InsertPost): Promise<Post>;
+  getUserPolls(userId: string): Promise<(Poll & { options: PollOption[] })[]>;
+  getUserStories(userId: string): Promise<Story[]>;
+  createPost(userId: string, post: InsertPost, expiresInHours?: number): Promise<Post>;
   deletePost(id: string, userId: string): Promise<boolean>;
+  deleteExpiredPosts(): Promise<number>;
   
   getComments(postId: string): Promise<Comment[]>;
   createComment(userId: string, comment: InsertComment): Promise<Comment>;
@@ -22,6 +25,7 @@ export interface IStorage {
   getActiveStories(): Promise<Story[]>;
   createStory(userId: string, story: InsertStory): Promise<Story>;
   viewStory(storyId: string): Promise<void>;
+  deleteStory(id: string, userId: string): Promise<boolean>;
   
   getPolls(category?: Category, userId?: string): Promise<(Poll & { options: PollOption[]; userVotedOptionId?: string | null })[]>;
   createPoll(userId: string, poll: InsertPoll): Promise<Poll & { options: PollOption[] }>;
@@ -55,14 +59,38 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(posts).where(eq(posts.userId, userId)).orderBy(desc(posts.createdAt));
   }
 
-  async createPost(userId: string, post: InsertPost): Promise<Post> {
+  async createPost(userId: string, post: InsertPost, expiresInHours?: number): Promise<Post> {
+    const expiresAt = expiresInHours ? new Date(Date.now() + expiresInHours * 60 * 60 * 1000) : null;
     const [newPost] = await db.insert(posts).values({
       userId,
       content: post.content,
       category: post.category,
       imageUrl: post.imageUrl,
+      expiresAt,
     }).returning();
     return newPost;
+  }
+
+  async deleteExpiredPosts(): Promise<number> {
+    const now = new Date();
+    const result = await db.delete(posts).where(and(
+      sql`${posts.expiresAt} IS NOT NULL`,
+      sql`${posts.expiresAt} < ${now}`
+    )).returning();
+    return result.length;
+  }
+
+  async getUserPolls(userId: string): Promise<(Poll & { options: PollOption[] })[]> {
+    const pollsList = await db.select().from(polls).where(eq(polls.userId, userId)).orderBy(desc(polls.createdAt));
+    const result = await Promise.all(pollsList.map(async (poll) => {
+      const options = await db.select().from(pollOptions).where(eq(pollOptions.pollId, poll.id));
+      return { ...poll, options };
+    }));
+    return result;
+  }
+
+  async getUserStories(userId: string): Promise<Story[]> {
+    return db.select().from(stories).where(eq(stories.userId, userId)).orderBy(desc(stories.createdAt));
   }
 
   async deletePost(id: string, userId: string): Promise<boolean> {
@@ -210,6 +238,11 @@ export class DatabaseStorage implements IStorage {
 
   async viewStory(storyId: string): Promise<void> {
     await db.update(stories).set({ viewCount: sql`${stories.viewCount} + 1` }).where(eq(stories.id, storyId));
+  }
+
+  async deleteStory(id: string, userId: string): Promise<boolean> {
+    const result = await db.delete(stories).where(and(eq(stories.id, id), eq(stories.userId, userId))).returning();
+    return result.length > 0;
   }
 
   async getPolls(category?: Category, userId?: string): Promise<(Poll & { options: PollOption[]; userVotedOptionId?: string | null })[]> {

@@ -25,6 +25,7 @@ export const posts = pgTable("posts", {
   downvotes: integer("downvotes").default(0).notNull(),
   commentCount: integer("comment_count").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at"),
 });
 
 export const comments = pgTable("comments", {
@@ -101,6 +102,8 @@ export const insertPostSchema = createInsertSchema(posts).pick({
   content: true,
   category: true,
   imageUrl: true,
+}).extend({
+  expiresInHours: z.number().optional(),
 });
 
 export const insertCommentSchema = createInsertSchema(comments).pick({

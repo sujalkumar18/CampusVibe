@@ -42,7 +42,7 @@ export function useCreatePost() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async (data: { userId: string; content: string; category: Category; imageUrl?: string }) => {
+    mutationFn: async (data: { userId: string; content: string; category: Category; imageUrl?: string; expiresInHours?: number }) => {
       const res = await apiRequest('POST', '/api/posts', data);
       return res.json();
     },

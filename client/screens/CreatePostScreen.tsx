@@ -109,6 +109,15 @@ export default function CreatePostScreen() {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [images, setImages] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [autoDeleteHours, setAutoDeleteHours] = useState<number | null>(null);
+
+  const AUTO_DELETE_OPTIONS = [
+    { label: "Never", value: null },
+    { label: "1 Hour", value: 1 },
+    { label: "6 Hours", value: 6 },
+    { label: "12 Hours", value: 12 },
+    { label: "24 Hours", value: 24 },
+  ];
 
   const canPost = content.trim().length > 0 && selectedCategory !== null && !createPost.isPending && !isUploading;
   const charsLeft = MAX_CHARS - content.length;
@@ -152,6 +161,7 @@ export default function CreatePostScreen() {
         content: content.trim(),
         category: selectedCategory,
         imageUrl: uploadedImageUrl,
+        expiresInHours: autoDeleteHours || undefined,
       });
 
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -305,6 +315,34 @@ export default function CreatePostScreen() {
               Add Photo
             </ThemedText>
           </Pressable>
+        </View>
+
+        <ThemedText type="small" style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+          Auto-Delete
+        </ThemedText>
+        <View style={styles.autoDeleteContainer}>
+          {AUTO_DELETE_OPTIONS.map((option) => (
+            <Pressable
+              key={option.label}
+              onPress={() => setAutoDeleteHours(option.value)}
+              style={[
+                styles.autoDeleteOption,
+                {
+                  backgroundColor: autoDeleteHours === option.value ? theme.primary : theme.surface,
+                },
+              ]}
+            >
+              <ThemedText
+                style={{
+                  color: autoDeleteHours === option.value ? "#FFFFFF" : theme.text,
+                  fontSize: 12,
+                  fontWeight: "600",
+                }}
+              >
+                {option.label}
+              </ThemedText>
+            </Pressable>
+          ))}
         </View>
 
         <View style={[styles.anonymousBadge, { backgroundColor: theme.surface }]}>
@@ -465,5 +503,17 @@ const styles = StyleSheet.create({
   },
   anonymousText: {
     fontSize: 13,
+  },
+  autoDeleteContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    paddingHorizontal: Spacing.md,
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  autoDeleteOption: {
+    paddingHorizontal: Spacing.sm + 4,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
   },
 });

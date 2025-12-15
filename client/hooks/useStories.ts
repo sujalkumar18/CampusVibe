@@ -41,3 +41,25 @@ export function useViewStory() {
     },
   });
 }
+
+export function useDeleteStory() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ storyId, userId }: { storyId: string; userId: string }) => {
+      const res = await apiRequest('DELETE', `/api/stories/${storyId}`, { userId });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['api', 'stories'] });
+    },
+  });
+}
+
+export function useUserStories(userId: string | undefined) {
+  return useQuery<{ stories: Story[] }>({
+    queryKey: ['api', 'users', userId, 'stories'],
+    enabled: !!userId,
+    refetchOnMount: true,
+  });
+}
