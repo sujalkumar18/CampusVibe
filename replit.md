@@ -13,16 +13,21 @@ CampusVibe is an anonymous social media platform designed specifically for India
 - Created full CRUD API for posts, comments, and votes
 - Integrated frontend screens with real API data
 - Added Stories functionality with 24-hour expiration
+- Added delete functionality for stories and polls (user's own content only)
+- Added auto-delete option for text posts (1h, 6h, 12h, 24h expiry)
+- Improved CreateStoryScreen with video upload support and draggable text overlay
 
 ## Key Features
 - **Anonymous Posts**: Share text posts with category tags (Confession, Crush, Meme, Rant, Compliment)
 - **Reels**: Short video feed similar to Instagram/TikTok
-- **Stories**: 24-hour disappearing content
+- **Stories**: 24-hour disappearing content with photo/video backgrounds and movable text
+- **Polls**: Create polls and vote anonymously
 - **Photo Posts**: Add images to your anonymous posts
 - **Upvote/Downvote System**: Reddit-style voting on content
 - **Comments**: Engage with posts anonymously
 - **Profile**: View and manage your own anonymous posts
-- **Delete Posts**: Remove your content anytime
+- **Delete Content**: Remove your posts, stories, and polls anytime
+- **Auto-Delete**: Set posts to automatically expire after 1h, 6h, 12h, or 24h
 
 ## Tech Stack
 - **Frontend**: React Native with Expo SDK 54
