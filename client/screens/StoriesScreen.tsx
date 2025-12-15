@@ -12,6 +12,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
+import { Image } from "expo-image";
+import { Video, ResizeMode } from "expo-av";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -39,6 +41,8 @@ type Story = {
   content: string;
   timeRemaining: string;
   backgroundColor: string;
+  mediaUrl: string | null;
+  mediaType: "image" | "video" | null;
   viewed: boolean;
 };
 
@@ -57,15 +61,27 @@ const getTimeRemaining = (expiresAt: string): string => {
   return `${minutes}m left`;
 };
 
-const mapAPIStoryToStory = (apiStory: APIStory, index: number): Story => ({
-  id: apiStory.id,
-  userId: apiStory.userId,
-  category: "confession",
-  content: apiStory.caption || "Story",
-  timeRemaining: getTimeRemaining(apiStory.expiresAt),
-  backgroundColor: BACKGROUND_COLORS[index % BACKGROUND_COLORS.length],
-  viewed: false,
-});
+const isVideoUrl = (url: string): boolean => {
+  return url.endsWith('.mp4') || url.endsWith('.mov') || url.endsWith('.webm') || url.includes('video');
+};
+
+const mapAPIStoryToStory = (apiStory: APIStory, index: number): Story => {
+  const imageUrl = apiStory.imageUrl;
+  const isColor = imageUrl.startsWith('#');
+  const isVideo = !isColor && isVideoUrl(imageUrl);
+  
+  return {
+    id: apiStory.id,
+    userId: apiStory.userId,
+    category: "confession",
+    content: apiStory.caption || "",
+    timeRemaining: getTimeRemaining(apiStory.expiresAt),
+    backgroundColor: isColor ? imageUrl : BACKGROUND_COLORS[index % BACKGROUND_COLORS.length],
+    mediaUrl: isColor ? null : imageUrl,
+    mediaType: isColor ? null : (isVideo ? "video" : "image"),
+    viewed: false,
+  };
+};
 
 const StoryRing = ({
   story,
@@ -258,18 +274,28 @@ const StoryViewer = ({
             </View>
           </View>
 
+          {currentStory.mediaUrl && currentStory.mediaType === "image" && (
+            <Image
+              source={{ uri: currentStory.mediaUrl }}
+              style={styles.storyMediaBackground}
+              contentFit="cover"
+            />
+          )}
+          {currentStory.mediaUrl && currentStory.mediaType === "video" && (
+            <Video
+              source={{ uri: currentStory.mediaUrl }}
+              style={styles.storyMediaBackground}
+              resizeMode={ResizeMode.COVER}
+              shouldPlay
+              isLooping
+              isMuted={false}
+            />
+          )}
+
           <View style={styles.storyContent}>
-            <View
-              style={[
-                styles.storyCategoryBadge,
-                { backgroundColor: categoryColor + "40" },
-              ]}
-            >
-              <ThemedText style={[styles.storyCategoryText, { color: categoryColor }]}>
-                {categoryLabels[currentStory.category]}
-              </ThemedText>
-            </View>
-            <ThemedText style={styles.storyText}>{currentStory.content}</ThemedText>
+            {currentStory.content ? (
+              <ThemedText style={styles.storyText}>{currentStory.content}</ThemedText>
+            ) : null}
           </View>
         </View>
       </GestureDetector>
@@ -665,5 +691,14 @@ const styles = StyleSheet.create({
     textShadowColor: "rgba(0,0,0,0.3)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
+  },
+  storyMediaBackground: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: "100%",
+    height: "100%",
   },
 });

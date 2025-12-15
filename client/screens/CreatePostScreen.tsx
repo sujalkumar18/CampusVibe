@@ -174,10 +174,6 @@ export default function CreatePostScreen() {
     }
   };
 
-  const handleCreateReel = () => {
-    navigation.replace("CreateReel");
-  };
-
   const handleCreateStory = () => {
     navigation.replace("CreateStory");
   };
@@ -219,15 +215,6 @@ export default function CreatePostScreen() {
         }}
       >
         <View style={styles.typeSelector}>
-          <Pressable
-            onPress={handleCreateReel}
-            style={[styles.typeButton, { backgroundColor: theme.surface }]}
-          >
-            <Feather name="film" size={18} color={theme.primary} />
-            <ThemedText style={[styles.typeLabel, { color: theme.primary }]}>
-              Create Reel
-            </ThemedText>
-          </Pressable>
           <Pressable
             onPress={handleCreateStory}
             style={[styles.typeButton, { backgroundColor: theme.surface }]}
