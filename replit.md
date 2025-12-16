@@ -12,21 +12,21 @@ CampusVibe is an anonymous social media platform designed specifically for India
 - Added user authentication via device ID (anonymous)
 - Created full CRUD API for posts, comments, and votes
 - Integrated frontend screens with real API data
-- Added Stories functionality with 24-hour expiration
-- Added delete functionality for stories and polls (user's own content only)
+- Added delete functionality for posts and polls (user's own content only)
 - Added auto-delete option for text posts (1h, 6h, 12h, 24h expiry)
-- Improved CreateStoryScreen with video upload support and draggable text overlay
+- **Removed Stories feature** - Simplified app to focus on text-based posts
+- **Added video upload support to posts** - Twitter-style posts with photo/video attachments
 
 ## Key Features
 - **Anonymous Posts**: Share text posts with category tags (Confession, Crush, Meme, Rant, Compliment)
 - **Reels**: Short video feed similar to Instagram/TikTok
-- **Stories**: 24-hour disappearing content with photo/video backgrounds and movable text
 - **Polls**: Create polls and vote anonymously
 - **Photo Posts**: Add images to your anonymous posts
+- **Video Posts**: Add videos to your anonymous posts (Twitter-style)
 - **Upvote/Downvote System**: Reddit-style voting on content
 - **Comments**: Engage with posts anonymously
 - **Profile**: View and manage your own anonymous posts
-- **Delete Content**: Remove your posts, stories, and polls anytime
+- **Delete Content**: Remove your posts and polls anytime
 - **Auto-Delete**: Set posts to automatically expire after 1h, 6h, 12h, or 24h
 
 ## Tech Stack
@@ -45,20 +45,17 @@ client/
 ├── screens/
 │   ├── HomeScreen.tsx          # Main feed with posts (API integrated)
 │   ├── ReelsScreen.tsx         # Short video feed
-│   ├── StoriesScreen.tsx       # 24-hour stories
 │   ├── ProfileScreen.tsx       # User's post history (API integrated)
 │   ├── CreatePostScreen.tsx    # Create new post modal (API integrated)
 │   ├── CreateReelScreen.tsx    # Record/upload reel
-│   ├── CreateStoryScreen.tsx   # Create story
 │   └── PostDetailScreen.tsx    # Single post with comments (API integrated)
 ├── navigation/
 │   ├── RootStackNavigator.tsx  # Root navigation
-│   └── MainTabNavigator.tsx    # 5-tab bottom navigator
+│   └── MainTabNavigator.tsx    # 4-tab bottom navigator
 ├── hooks/
 │   ├── useAuth.ts              # Device-based anonymous auth
 │   ├── usePosts.ts             # Posts CRUD operations
-│   ├── useComments.ts          # Comments CRUD operations
-│   └── useStories.ts           # Stories operations
+│   └── useComments.ts          # Comments CRUD operations
 ├── components/
 │   └── (Shared UI components)
 └── constants/
