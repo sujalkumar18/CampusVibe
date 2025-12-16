@@ -21,6 +21,7 @@ export const posts = pgTable("posts", {
   content: text("content").notNull(),
   category: categoryEnum("category").notNull(),
   imageUrl: text("image_url"),
+  videoUrl: text("video_url"),
   upvotes: integer("upvotes").default(0).notNull(),
   downvotes: integer("downvotes").default(0).notNull(),
   commentCount: integer("comment_count").default(0).notNull(),
@@ -102,6 +103,7 @@ export const insertPostSchema = createInsertSchema(posts).pick({
   content: true,
   category: true,
   imageUrl: true,
+  videoUrl: true,
 }).extend({
   expiresInHours: z.number().optional(),
 });

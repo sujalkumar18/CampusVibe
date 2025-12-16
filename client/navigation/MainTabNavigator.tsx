@@ -14,7 +14,6 @@ import Animated, {
 
 import HomeScreen from "@/screens/HomeScreen";
 import PollsScreen from "@/screens/PollsScreen";
-import StoriesScreen from "@/screens/StoriesScreen";
 import ProfileScreen from "@/screens/ProfileScreen";
 import { useTheme } from "@/hooks/useTheme";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
@@ -24,7 +23,6 @@ export type MainTabParamList = {
   HomeTab: undefined;
   PollsTab: undefined;
   CreateTab: undefined;
-  StoriesTab: undefined;
   ProfileTab: undefined;
 };
 
@@ -130,15 +128,6 @@ export default function MainTabNavigator() {
         component={EmptyScreen}
         options={{
           tabBarButton: () => <CreateButton />,
-        }}
-      />
-      <Tab.Screen
-        name="StoriesTab"
-        component={StoriesScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => (
-            <Feather name="clock" size={size} color={color} />
-          ),
         }}
       />
       <Tab.Screen

@@ -108,6 +108,7 @@ export default function CreatePostScreen() {
   const [content, setContent] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [images, setImages] = useState<string[]>([]);
+  const [video, setVideo] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [autoDeleteHours, setAutoDeleteHours] = useState<number | null>(null);
 
@@ -136,6 +137,22 @@ export default function CreatePostScreen() {
     }
   };
 
+  const handlePickVideo = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+      allowsMultipleSelection: false,
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setVideo(result.assets[0].uri);
+    }
+  };
+
+  const handleRemoveVideo = () => {
+    setVideo(null);
+  };
+
   const handleRemoveImage = (index: number) => {
     setImages(images.filter((_, i) => i !== index));
   };
@@ -146,6 +163,7 @@ export default function CreatePostScreen() {
     try {
       setIsUploading(true);
       let uploadedImageUrl: string | undefined;
+      let uploadedVideoUrl: string | undefined;
 
       if (images.length > 0) {
         const uploadResult = await uploadFile.mutateAsync({
@@ -156,11 +174,21 @@ export default function CreatePostScreen() {
         uploadedImageUrl = uploadResult.url;
       }
 
+      if (video) {
+        const uploadResult = await uploadFile.mutateAsync({
+          uri: video,
+          type: 'video/mp4',
+          name: `post-video-${Date.now()}.mp4`,
+        });
+        uploadedVideoUrl = uploadResult.url;
+      }
+
       await createPost.mutateAsync({
         userId: user.id,
         content: content.trim(),
         category: selectedCategory,
         imageUrl: uploadedImageUrl,
+        videoUrl: uploadedVideoUrl,
         expiresInHours: autoDeleteHours || undefined,
       });
 
@@ -174,9 +202,6 @@ export default function CreatePostScreen() {
     }
   };
 
-  const handleCreateStory = () => {
-    navigation.replace("CreateStory");
-  };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot, paddingTop: insets.top }]}>
@@ -214,19 +239,7 @@ export default function CreatePostScreen() {
           paddingBottom: insets.bottom + Spacing.xl,
         }}
       >
-        <View style={styles.typeSelector}>
-          <Pressable
-            onPress={handleCreateStory}
-            style={[styles.typeButton, { backgroundColor: theme.surface }]}
-          >
-            <Feather name="clock" size={18} color={theme.primary} />
-            <ThemedText style={[styles.typeLabel, { color: theme.primary }]}>
-              Add Story
-            </ThemedText>
-          </Pressable>
-        </View>
-
-        <ThemedText type="small" style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+        <ThemedText type="small" style={[styles.sectionLabel, { color: theme.textSecondary, marginTop: Spacing.md }]}>
           Category
         </ThemedText>
         <View style={styles.categoriesContainer}>
@@ -282,6 +295,23 @@ export default function CreatePostScreen() {
           </View>
         )}
 
+        {video && (
+          <View style={styles.videoPreviewContainer}>
+            <View style={[styles.videoPreview, { backgroundColor: theme.surface }]}>
+              <Feather name="video" size={32} color={theme.primary} />
+              <ThemedText style={{ color: theme.text, marginTop: Spacing.xs }}>
+                Video attached
+              </ThemedText>
+            </View>
+            <Pressable
+              onPress={handleRemoveVideo}
+              style={styles.removeImageButton}
+            >
+              <Feather name="x" size={16} color="#FFFFFF" />
+            </Pressable>
+          </View>
+        )}
+
         <View style={styles.actionsRow}>
           <Pressable
             onPress={handlePickImage}
@@ -300,6 +330,25 @@ export default function CreatePostScreen() {
               ]}
             >
               Add Photo
+            </ThemedText>
+          </Pressable>
+          <Pressable
+            onPress={handlePickVideo}
+            style={[styles.actionButton, { backgroundColor: theme.surface }]}
+            disabled={video !== null}
+          >
+            <Feather
+              name="video"
+              size={20}
+              color={video !== null ? theme.textTertiary : theme.primary}
+            />
+            <ThemedText
+              style={[
+                styles.actionLabel,
+                { color: video !== null ? theme.textTertiary : theme.text },
+              ]}
+            >
+              Add Video
             </ThemedText>
           </Pressable>
         </View>
@@ -477,6 +526,18 @@ const styles = StyleSheet.create({
   },
   actionLabel: {
     fontSize: 14,
+  },
+  videoPreviewContainer: {
+    marginHorizontal: Spacing.md,
+    marginTop: Spacing.md,
+    position: "relative",
+  },
+  videoPreview: {
+    width: 120,
+    height: 100,
+    borderRadius: BorderRadius.sm,
+    alignItems: "center",
+    justifyContent: "center",
   },
   anonymousBadge: {
     flexDirection: "row",
