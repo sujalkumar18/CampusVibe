@@ -27,10 +27,26 @@ function setupCors(app: express.Application) {
         origins.add(`https://${d.trim()}`);
       });
     }
+    
+    // Add custom allowed origins from env (for Render.com deployment)
+    if (process.env.ALLOWED_ORIGINS) {
+      process.env.ALLOWED_ORIGINS.split(",").forEach((d) => {
+        origins.add(d.trim());
+      });
+    }
 
     const origin = req.header("origin");
 
-    if (origin && origins.has(origin)) {
+    // Mobile apps don't send origin header, so allow requests without origin
+    // This is safe because CORS is only enforced by browsers
+    if (!origin) {
+      res.header("Access-Control-Allow-Origin", "*");
+      res.header(
+        "Access-Control-Allow-Methods",
+        "GET, POST, PUT, DELETE, OPTIONS",
+      );
+      res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    } else if (origins.has(origin)) {
       res.header("Access-Control-Allow-Origin", origin);
       res.header(
         "Access-Control-Allow-Methods",

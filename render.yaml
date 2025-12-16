@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: campusvibe-backend
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm install && npm run server:build
+    startCommand: node server_dist/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
