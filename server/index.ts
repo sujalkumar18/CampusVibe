@@ -3,6 +3,7 @@ import type { Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import * as fs from "fs";
 import * as path from "path";
+import { storage } from "./storage";
 
 const app = express();
 const log = console.log;
@@ -238,4 +239,16 @@ function setupErrorHandler(app: express.Application) {
       log(`express server serving on port ${port}`);
     },
   );
+
+  // Run auto-delete for expired posts every minute
+  setInterval(async () => {
+    try {
+      const deletedCount = await storage.deleteExpiredPosts();
+      if (deletedCount > 0) {
+        log(`Auto-deleted ${deletedCount} expired posts`);
+      }
+    } catch (error) {
+      console.error("Error deleting expired posts:", error);
+    }
+  }, 60 * 1000); // Every 1 minute
 })();

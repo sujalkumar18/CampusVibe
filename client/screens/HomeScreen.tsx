@@ -10,6 +10,7 @@ import Animated, {
   withSpring,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
+import { Image } from "expo-image";
 
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/hooks/useAuth";
@@ -154,6 +155,27 @@ const PostCard = ({
         </View>
 
         <ThemedText style={styles.postContent}>{post.content}</ThemedText>
+
+        {post.imageUrl && (
+          <View style={styles.postMedia}>
+            <Image
+              source={{ uri: post.imageUrl }}
+              style={styles.postImage}
+              contentFit="cover"
+            />
+          </View>
+        )}
+
+        {post.videoUrl && (
+          <View style={[styles.postMedia, styles.videoContainer]}>
+            <View style={[styles.videoPlaceholder, { backgroundColor: theme.surface }]}>
+              <Feather name="play-circle" size={40} color={theme.primary} />
+              <ThemedText style={{ color: theme.textSecondary, marginTop: Spacing.xs }}>
+                Video
+              </ThemedText>
+            </View>
+          </View>
+        )}
 
         <View style={styles.postFooter}>
           <View style={styles.voteContainer}>
@@ -307,6 +329,27 @@ const styles = StyleSheet.create({
   postContent: {
     fontSize: 15,
     marginBottom: Spacing.md,
+  },
+  postMedia: {
+    marginBottom: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    overflow: 'hidden',
+  },
+  postImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: BorderRadius.sm,
+  },
+  videoContainer: {
+    height: 150,
+  },
+  videoPlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   postFooter: {
     flexDirection: "row",

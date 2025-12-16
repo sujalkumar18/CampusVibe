@@ -66,6 +66,7 @@ export class DatabaseStorage implements IStorage {
       content: post.content,
       category: post.category,
       imageUrl: post.imageUrl,
+      videoUrl: post.videoUrl,
       expiresAt,
     }).returning();
     return newPost;
