@@ -15,14 +15,15 @@ CampusVibe is an anonymous social media platform designed specifically for India
 - Added delete functionality for posts and polls (user's own content only)
 - Added auto-delete option for text posts (1h, 6h, 12h, 24h expiry)
 - **Removed Stories feature** - Simplified app to focus on text-based posts
-- **Added video upload support to posts** - Twitter-style posts with photo/video attachments
+- **Removed photo/video upload from posts** - Text-only posts for simplicity
+- **Fixed delete functionality** - Updated to use query params for better compatibility
+- **Configured deployment** - Backend ready for public deployment
+- **App store ready** - app.json and eas.json configured for APK/IPA builds
 
 ## Key Features
 - **Anonymous Posts**: Share text posts with category tags (Confession, Crush, Meme, Rant, Compliment)
 - **Reels**: Short video feed similar to Instagram/TikTok
 - **Polls**: Create polls and vote anonymously
-- **Photo Posts**: Add images to your anonymous posts
-- **Video Posts**: Add videos to your anonymous posts (Twitter-style)
 - **Upvote/Downvote System**: Reddit-style voting on content
 - **Comments**: Engage with posts anonymously
 - **Profile**: View and manage your own anonymous posts
