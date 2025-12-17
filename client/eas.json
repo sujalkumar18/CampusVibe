@@ -9,12 +9,18 @@
       "android": {
         "buildType": "apk",
         "package": "com.campusvibe.app"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://campusvibe-sdhc.onrender.com"
       }
     },
     "production": {
       "android": {
         "buildType": "apk",
         "package": "com.campusvibe.app"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://campusvibe-sdhc.onrender.com"
       }
     }
   },
