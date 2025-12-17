@@ -127,11 +127,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/posts/:id", async (req, res) => {
     try {
-      const { userId } = req.body;
+      const userId = req.body?.userId || req.query.userId;
       if (!userId) {
         return res.status(400).json({ error: "userId is required" });
       }
-      const deleted = await storage.deletePost(req.params.id, userId);
+      const deleted = await storage.deletePost(req.params.id, userId as string);
       if (!deleted) {
         return res.status(404).json({ error: "Post not found or unauthorized" });
       }
@@ -172,11 +172,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/comments/:id", async (req, res) => {
     try {
-      const { userId } = req.body;
+      const userId = req.body?.userId || req.query.userId;
       if (!userId) {
         return res.status(400).json({ error: "userId is required" });
       }
-      const deleted = await storage.deleteComment(req.params.id, userId);
+      const deleted = await storage.deleteComment(req.params.id, userId as string);
       if (!deleted) {
         return res.status(404).json({ error: "Comment not found or unauthorized" });
       }
@@ -349,11 +349,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/polls/:id", async (req, res) => {
     try {
-      const { userId } = req.body;
+      const userId = req.body?.userId || req.query.userId;
       if (!userId) {
         return res.status(400).json({ error: "userId is required" });
       }
-      const deleted = await storage.deletePoll(req.params.id, userId);
+      const deleted = await storage.deletePoll(req.params.id, userId as string);
       if (!deleted) {
         return res.status(404).json({ error: "Poll not found or unauthorized" });
       }

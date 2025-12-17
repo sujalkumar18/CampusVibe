@@ -58,7 +58,7 @@ export function useDeletePost() {
   
   return useMutation({
     mutationFn: async ({ postId, userId }: { postId: string; userId: string }) => {
-      const res = await apiRequest('DELETE', `/api/posts/${postId}`, { userId });
+      const res = await apiRequest('DELETE', `/api/posts/${postId}?userId=${encodeURIComponent(userId)}`);
       return res.json();
     },
     onSuccess: () => {

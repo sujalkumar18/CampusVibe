@@ -72,7 +72,7 @@ export function useDeletePoll() {
   
   return useMutation({
     mutationFn: async ({ pollId, userId }: { pollId: string; userId: string }) => {
-      const res = await apiRequest('DELETE', `/api/polls/${pollId}`, { userId });
+      const res = await apiRequest('DELETE', `/api/polls/${pollId}?userId=${encodeURIComponent(userId)}`);
       return res.json();
     },
     onSuccess: () => {
