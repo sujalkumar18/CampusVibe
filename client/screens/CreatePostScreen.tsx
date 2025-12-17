@@ -11,9 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Feather } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";
 import * as Haptics from "expo-haptics";
-import { Image } from "expo-image";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -24,7 +22,6 @@ import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollV
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/hooks/useAuth";
 import { useCreatePost } from "@/hooks/usePosts";
-import { useUpload } from "@/hooks/useUpload";
 import { Spacing, BorderRadius, CategoryColors } from "@/constants/theme";
 import { ThemedText } from "@/components/ThemedText";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
@@ -103,13 +100,9 @@ export default function CreatePostScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { user } = useAuth();
   const createPost = useCreatePost();
-  const uploadFile = useUpload();
 
   const [content, setContent] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
-  const [images, setImages] = useState<string[]>([]);
-  const [video, setVideo] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
   const [autoDeleteHours, setAutoDeleteHours] = useState<number | null>(null);
 
   const AUTO_DELETE_OPTIONS = [
@@ -120,75 +113,17 @@ export default function CreatePostScreen() {
     { label: "24 Hours", value: 24 },
   ];
 
-  const canPost = content.trim().length > 0 && selectedCategory !== null && !createPost.isPending && !isUploading;
+  const canPost = content.trim().length > 0 && selectedCategory !== null && !createPost.isPending;
   const charsLeft = MAX_CHARS - content.length;
-
-  const handlePickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsMultipleSelection: true,
-      quality: 0.8,
-      selectionLimit: 4 - images.length,
-    });
-
-    if (!result.canceled) {
-      const newImages = result.assets.map((asset: { uri: string }) => asset.uri);
-      setImages([...images, ...newImages].slice(0, 4));
-    }
-  };
-
-  const handlePickVideo = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-      allowsMultipleSelection: false,
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets[0]) {
-      setVideo(result.assets[0].uri);
-    }
-  };
-
-  const handleRemoveVideo = () => {
-    setVideo(null);
-  };
-
-  const handleRemoveImage = (index: number) => {
-    setImages(images.filter((_, i) => i !== index));
-  };
 
   const handlePost = async () => {
     if (!canPost || !user || !selectedCategory) return;
 
     try {
-      setIsUploading(true);
-      let uploadedImageUrl: string | undefined;
-      let uploadedVideoUrl: string | undefined;
-
-      if (images.length > 0) {
-        const uploadResult = await uploadFile.mutateAsync({
-          uri: images[0],
-          type: 'image/jpeg',
-          name: `post-${Date.now()}.jpg`,
-        });
-        uploadedImageUrl = uploadResult.url;
-      }
-
-      if (video) {
-        const uploadResult = await uploadFile.mutateAsync({
-          uri: video,
-          type: 'video/mp4',
-          name: `post-video-${Date.now()}.mp4`,
-        });
-        uploadedVideoUrl = uploadResult.url;
-      }
-
       await createPost.mutateAsync({
         userId: user.id,
         content: content.trim(),
         category: selectedCategory,
-        imageUrl: uploadedImageUrl,
-        videoUrl: uploadedVideoUrl,
         expiresInHours: autoDeleteHours || undefined,
       });
 
@@ -197,8 +132,6 @@ export default function CreatePostScreen() {
     } catch (error) {
       console.error("Failed to create post:", error);
       Alert.alert("Error", "Failed to create post. Please try again.");
-    } finally {
-      setIsUploading(false);
     }
   };
 
@@ -277,80 +210,6 @@ export default function CreatePostScreen() {
               {charsLeft}
             </ThemedText>
           </View>
-        </View>
-
-        {images.length > 0 && (
-          <View style={styles.imagesGrid}>
-            {images.map((uri, index) => (
-              <View key={index} style={styles.imageWrapper}>
-                <Image source={{ uri }} style={styles.imagePreview} />
-                <Pressable
-                  onPress={() => handleRemoveImage(index)}
-                  style={styles.removeImageButton}
-                >
-                  <Feather name="x" size={16} color="#FFFFFF" />
-                </Pressable>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {video && (
-          <View style={styles.videoPreviewContainer}>
-            <View style={[styles.videoPreview, { backgroundColor: theme.surface }]}>
-              <Feather name="video" size={32} color={theme.primary} />
-              <ThemedText style={{ color: theme.text, marginTop: Spacing.xs }}>
-                Video attached
-              </ThemedText>
-            </View>
-            <Pressable
-              onPress={handleRemoveVideo}
-              style={styles.removeImageButton}
-            >
-              <Feather name="x" size={16} color="#FFFFFF" />
-            </Pressable>
-          </View>
-        )}
-
-        <View style={styles.actionsRow}>
-          <Pressable
-            onPress={handlePickImage}
-            style={[styles.actionButton, { backgroundColor: theme.surface }]}
-            disabled={images.length >= 4}
-          >
-            <Feather
-              name="image"
-              size={20}
-              color={images.length >= 4 ? theme.textTertiary : theme.primary}
-            />
-            <ThemedText
-              style={[
-                styles.actionLabel,
-                { color: images.length >= 4 ? theme.textTertiary : theme.text },
-              ]}
-            >
-              Add Photo
-            </ThemedText>
-          </Pressable>
-          <Pressable
-            onPress={handlePickVideo}
-            style={[styles.actionButton, { backgroundColor: theme.surface }]}
-            disabled={video !== null}
-          >
-            <Feather
-              name="video"
-              size={20}
-              color={video !== null ? theme.textTertiary : theme.primary}
-            />
-            <ThemedText
-              style={[
-                styles.actionLabel,
-                { color: video !== null ? theme.textTertiary : theme.text },
-              ]}
-            >
-              Add Video
-            </ThemedText>
-          </Pressable>
         </View>
 
         <ThemedText type="small" style={[styles.sectionLabel, { color: theme.textSecondary }]}>
@@ -481,63 +340,6 @@ const styles = StyleSheet.create({
   },
   charCountText: {
     fontSize: 12,
-  },
-  imagesGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    paddingHorizontal: Spacing.md,
-    marginTop: Spacing.md,
-    gap: Spacing.sm,
-  },
-  imageWrapper: {
-    position: "relative",
-    width: 100,
-    height: 100,
-  },
-  imagePreview: {
-    width: "100%",
-    height: "100%",
-    borderRadius: BorderRadius.sm,
-  },
-  removeImageButton: {
-    position: "absolute",
-    top: -8,
-    right: -8,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "rgba(0,0,0,0.7)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  actionsRow: {
-    flexDirection: "row",
-    paddingHorizontal: Spacing.md,
-    marginTop: Spacing.md,
-    gap: Spacing.sm,
-  },
-  actionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.md,
-    gap: Spacing.xs,
-  },
-  actionLabel: {
-    fontSize: 14,
-  },
-  videoPreviewContainer: {
-    marginHorizontal: Spacing.md,
-    marginTop: Spacing.md,
-    position: "relative",
-  },
-  videoPreview: {
-    width: 120,
-    height: 100,
-    borderRadius: BorderRadius.sm,
-    alignItems: "center",
-    justifyContent: "center",
   },
   anonymousBadge: {
     flexDirection: "row",
