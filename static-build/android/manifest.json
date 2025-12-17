@@ -1,0 +1,56 @@
+{
+  "id": "c7840133-ea8f-4330-be33-cf9ec63a8833",
+  "createdAt": "2025-12-17T11:40:34.762Z",
+  "runtimeVersion": "exposdk:54.0.0",
+  "launchAsset": {
+    "key": "bundle-1765971634762-2515",
+    "contentType": "application/javascript",
+    "url": "https://fd2eafbb-94f9-4697-b3ea-d5c212f7fed0-00-1l3pzymut30jv.spock.replit.dev/1765971634762-2515/_expo/static/js/android/bundle.js"
+  },
+  "assets": [],
+  "metadata": {},
+  "extra": {
+    "eas": {
+      "projectId": "0646745d-e2ac-4b67-b742-539a593a82d5"
+    },
+    "expoClient": {
+      "extra": {
+        "eas": {
+          "projectId": "0646745d-e2ac-4b67-b742-539a593a82d5"
+        }
+      },
+      "android": {
+        "package": "com.campusvibe.app"
+      },
+      "_internal": {
+        "isDebug": false,
+        "projectRoot": "/home/runner/workspace",
+        "dynamicConfigPath": null,
+        "staticConfigPath": "/home/runner/workspace/app.json",
+        "packageJsonPath": "/home/runner/workspace/package.json"
+      },
+      "name": "my-app",
+      "slug": "my-app",
+      "version": "1.0.0",
+      "sdkVersion": "54.0.0",
+      "platforms": [
+        "ios",
+        "android",
+        "web"
+      ],
+      "hostUri": "fd2eafbb-94f9-4697-b3ea-d5c212f7fed0-00-1l3pzymut30jv.spock.replit.dev/android"
+    },
+    "expoGo": {
+      "debuggerHost": "fd2eafbb-94f9-4697-b3ea-d5c212f7fed0-00-1l3pzymut30jv.spock.replit.dev/android",
+      "developer": {
+        "tool": "expo-cli",
+        "projectRoot": "/home/runner/workspace"
+      },
+      "packagerOpts": {
+        "dev": false
+      },
+      "mainModuleName": "client/index"
+    },
+    "scopeKey": "@anonymous/my-app-6e07cf1e-30fb-49a4-b29f-69ee259b6943"
+  }
+}
