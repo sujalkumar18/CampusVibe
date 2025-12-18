@@ -27,10 +27,14 @@
       "favicon": "./assets/favicon.png"
     },
     "extra": {
-      "eas": {}
+      "eas": {
+        "projectId": "f34312c5-20b8-43c7-af82-e72132dee26f"
+      },
+      "router": {}
     },
     "plugins": [
       "expo-router"
-    ]
+    ],
+    "owner": "sujal.18"
   }
 }
