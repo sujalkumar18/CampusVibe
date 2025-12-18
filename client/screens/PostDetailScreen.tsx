@@ -20,12 +20,13 @@ import Animated, {
 
 import { useTheme } from "@/hooks/useTheme";
 import { useAuth } from "@/hooks/useAuth";
-import { usePost, useVote } from "@/hooks/usePosts";
+import { usePost, useVote, useDeletePost } from "@/hooks/usePosts";
 import { useComments, useCreateComment, type Comment } from "@/hooks/useComments";
 import { Spacing, BorderRadius, CategoryColors } from "@/constants/theme";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
+import { useNavigation } from "@react-navigation/native";
 
 const formatTimeAgo = (dateString: string): string => {
   const date = new Date(dateString);
@@ -95,6 +96,7 @@ export default function PostDetailScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
+  const navigation = useNavigation();
   const route = useRoute<RouteProp<RootStackParamList, "PostDetail">>();
   const { postId } = route.params;
   const { user } = useAuth();
@@ -103,6 +105,7 @@ export default function PostDetailScreen() {
   const { data: commentsData, isLoading: commentsLoading, refetch: refetchComments } = useComments(postId);
   const createComment = useCreateComment();
   const voteMutation = useVote();
+  const deletePost = useDeletePost();
 
   const [votes, setVotes] = useState({ up: false, down: false });
   const [localUpvotes, setLocalUpvotes] = useState(0);
@@ -162,6 +165,18 @@ export default function PostDetailScreen() {
       refetchComments();
     } catch (error) {
       console.error("Failed to create comment:", error);
+    }
+  };
+
+  const handleDeletePost = async () => {
+    if (!user || !post) return;
+    
+    try {
+      await deletePost.mutateAsync({ postId: post.id, userId: user.id });
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      navigation.goBack();
+    } catch (error) {
+      console.error("Failed to delete post:", error);
     }
   };
 
@@ -230,6 +245,10 @@ export default function PostDetailScreen() {
 
         <Pressable style={styles.shareButton}>
           <Feather name="share" size={20} color={theme.textSecondary} />
+        </Pressable>
+
+        <Pressable onPress={handleDeletePost} style={styles.deleteButton} disabled={deletePost.isPending}>
+          <Feather name="trash-2" size={20} color={theme.downvote} />
         </Pressable>
       </View>
 
@@ -378,6 +397,9 @@ const styles = StyleSheet.create({
   },
   shareButton: {
     marginLeft: "auto",
+    padding: Spacing.xs,
+  },
+  deleteButton: {
     padding: Spacing.xs,
   },
   divider: {
