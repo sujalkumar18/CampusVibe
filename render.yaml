@@ -5,9 +5,17 @@ services:
     region: oregon
     plan: free
     buildCommand: npm install && npm run server:build
-    startCommand: node server_dist/index.js
+    startCommand: node server_dist/index.cjs
+    healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
         sync: false
+      - key: ALLOWED_ORIGINS
+        value: "*"
+      - key: RENDER_EXTERNAL_URL
+        fromService:
+          name: campusvibe-backend
+          type: web
+          property: host

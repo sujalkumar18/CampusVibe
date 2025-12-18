@@ -39,6 +39,10 @@ const upload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  app.get("/api/health", (_req: Request, res: Response) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
   app.use("/uploads", (req: Request, res: Response, next) => {
     res.setHeader("Cache-Control", "public, max-age=31536000");
     next();

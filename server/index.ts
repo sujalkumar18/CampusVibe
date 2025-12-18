@@ -267,4 +267,22 @@ function setupErrorHandler(app: express.Application) {
       console.error("Error deleting expired posts:", error);
     }
   }, 60 * 1000); // Every 1 minute
+
+  // Keep-alive: Self-ping to prevent Render free tier from sleeping
+  // Pings every 14 minutes (Render sleeps after 15 min of inactivity)
+  if (process.env.NODE_ENV === "production" && process.env.RENDER_EXTERNAL_URL) {
+    const host = process.env.RENDER_EXTERNAL_URL;
+    const keepAliveUrl = (host.startsWith("http") ? host : `https://${host}`) + "/api/health";
+    setInterval(async () => {
+      try {
+        const response = await fetch(keepAliveUrl);
+        if (response.ok) {
+          log(`Keep-alive ping successful`);
+        }
+      } catch (error) {
+        console.error("Keep-alive ping failed:", error);
+      }
+    }, 14 * 60 * 1000); // Every 14 minutes
+    log(`Keep-alive enabled: pinging ${keepAliveUrl} every 14 minutes`);
+  }
 })();
