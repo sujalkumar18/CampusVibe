@@ -109,6 +109,17 @@ shared/
 - **Web**: Open the Replit webview
 - **Mobile**: Scan QR code with Expo Go app
 
+## Deployment (Render + APK)
+- **Backend Deployment**: See `RENDER_DEPLOY.md` for complete guide
+- **Render URL**: `https://campusvibe-backend.onrender.com` (update in eas.json if different)
+- **Keep-Alive**: Built-in self-ping every 14 min to prevent free tier sleep
+- **APK Build**: `npx eas-cli build --platform android --profile preview`
+
+## Key Configurations
+- `render.yaml` - Render deployment config
+- `eas.json` - Expo EAS build config
+- `client/eas.json` - Client-specific EAS config
+
 ## User Preferences
 - Hindi-speaking Indian college student target audience
 - Dark mode preferred
