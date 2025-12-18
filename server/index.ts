@@ -4,6 +4,7 @@ import { registerRoutes } from "./routes";
 import * as fs from "fs";
 import * as path from "path";
 import { storage } from "./storage";
+import { runMigrations } from "./migrations";
 
 const app = express();
 const log = console.log;
@@ -234,6 +235,16 @@ function setupErrorHandler(app: express.Application) {
 }
 
 (async () => {
+  // Run migrations on startup
+  try {
+    await runMigrations();
+  } catch (error) {
+    console.error("Failed to run migrations:", error);
+    if (process.env.NODE_ENV === "production") {
+      throw error;
+    }
+  }
+
   setupCors(app);
   setupBodyParsing(app);
   setupRequestLogging(app);
