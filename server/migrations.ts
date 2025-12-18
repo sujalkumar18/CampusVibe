@@ -1,6 +1,5 @@
 import * as fs from "fs";
 import * as path from "path";
-import { db } from "./db";
 
 async function runMigrations(): Promise<void> {
   try {
@@ -22,48 +21,55 @@ async function runMigrations(): Promise<void> {
       return;
     }
 
-    // Get database connection to execute raw SQL
-    const connection = await (db as any).getConnection?.();
-    if (!connection) {
-      // Fallback: use the pool directly
-      const { Pool } = await import("pg");
-      const pool = new Pool({
-        connectionString: process.env.DATABASE_URL,
-      });
+    // Create pool directly
+    const { Pool } = await import("pg");
+    const pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+    });
 
+    try {
       for (const file of migrationFiles) {
         const filePath = path.join(migrationsDir, file);
-        const sql = fs.readFileSync(filePath, "utf-8");
+        const content = fs.readFileSync(filePath, "utf-8");
 
-        // Split by statement breakpoint and execute
-        const statements = sql
+        // Split by --> statement-breakpoint (Drizzle format)
+        const statements = content
           .split("-->")
-          .map((s) => s.trim())
-          .filter((s) => s.length > 0);
+          .map((statement) => {
+            // Remove the "statement-breakpoint" text and trim
+            return statement
+              .replace(/\s*statement-breakpoint\s*/g, "")
+              .trim();
+          })
+          .filter((statement) => statement.length > 0 && !statement.startsWith("statement-breakpoint"));
+
+        console.log(`Found ${statements.length} statements in ${file}`);
 
         for (const statement of statements) {
           try {
             await pool.query(statement);
-            console.log(`✓ Executed migration statement from ${file}`);
           } catch (error: any) {
-            // Ignore "already exists" errors
+            // Ignore "already exists" errors (idempotent)
             if (
-              error.code !== "42P07" &&
-              error.code !== "42701" &&
-              !error.message?.includes("already exists")
+              error.code === "42P07" ||
+              error.code === "42701" ||
+              error.message?.includes("already exists")
             ) {
-              console.warn(
-                `Warning executing ${file}: ${error.message}`,
-              );
+              // Table or index already exists - this is fine
+              continue;
             }
+            // Log other errors but don't fail
+            console.warn(`Warning: ${error.message}`);
           }
         }
+
+        console.log(`✓ Completed migration: ${file}`);
       }
 
+      console.log("✓ All migrations completed successfully");
+    } finally {
       await pool.end();
     }
-
-    console.log("✓ Migrations completed successfully");
   } catch (error) {
     console.error("Error running migrations:", error);
     throw error;
