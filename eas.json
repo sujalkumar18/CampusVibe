@@ -12,7 +12,7 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk",
-        "ndk": "27.0.12077973"
+        "image": "latest"
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://campusvibe-backend-q5os.onrender.com"
@@ -22,7 +22,7 @@
       "autoIncrement": true,
       "android": {
         "buildType": "apk",
-        "ndk": "27.0.12077973"
+        "image": "latest"
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://campusvibe-backend-q5os.onrender.com"
