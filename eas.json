@@ -14,7 +14,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://campusvibe-backend.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://campusvibe-backend-q5os.onrender.com"
       }
     },
     "production": {
@@ -23,7 +23,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://campusvibe-backend.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://campusvibe-backend-q5os.onrender.com"
       }
     }
   },
