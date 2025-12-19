@@ -33,18 +33,7 @@
       "router": {}
     },
     "plugins": [
-      "expo-router",
-      [
-        "expo-build-properties",
-        {
-          "android": {
-            "minSdkVersion": 24,
-            "compileSdkVersion": 35,
-            "targetSdkVersion": 34,
-            "kotlinVersion": "1.9.25"
-          }
-        }
-      ]
+      "expo-router"
     ],
     "owner": "sujal.18"
   }
