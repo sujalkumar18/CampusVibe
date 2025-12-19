@@ -21,7 +21,10 @@
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundColor": "#121212"
       },
-      "package": "com.campusvibe.app"
+      "package": "com.campusvibe.app",
+      "versionCode": 1,
+      "targetSdkVersion": 34,
+      "minSdkVersion": 21
     },
     "web": {
       "favicon": "./assets/images/favicon.png"

@@ -11,10 +11,13 @@
     "preview": {
       "distribution": "internal",
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease",
+        "withoutCredentialsContext": true
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://campusvibe-backend-q5os.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://campusvibe-backend-q5os.onrender.com",
+        "ORG_GRADLE_PROJECT_org_gradle_jvmargs": "-Xmx2048m -XX:MaxMetaspaceSize=512m"
       }
     },
     "production": {
