@@ -111,11 +111,9 @@ const PollOptionItem = ({
         )}
         <View style={styles.pollOptionContent}>
           <ThemedText style={styles.pollOptionText}>{option.optionText}</ThemedText>
-          {hasVoted && (
-            <ThemedText style={[styles.pollPercentage, { color: theme.textSecondary }]}>
-              {percentage}%
-            </ThemedText>
-          )}
+          <ThemedText style={[styles.pollPercentage, { color: theme.textSecondary }]}>
+            {percentage}% ({option.voteCount} {option.voteCount === 1 ? "vote" : "votes"})
+          </ThemedText>
         </View>
         {isSelected && (
           <Feather name="check-circle" size={18} color={Colors.dark.primary} style={styles.checkIcon} />
