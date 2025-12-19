@@ -11,7 +11,7 @@
         "package": "com.campusvibe.app"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://campusvibe-backend.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://campusvibe-backend-q5os.onrender.com"
       }
     },
     "production": {
@@ -20,7 +20,7 @@
         "package": "com.campusvibe.app"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://campusvibe-backend.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://campusvibe-backend-q5os.onrender.com"
       }
     }
   },
